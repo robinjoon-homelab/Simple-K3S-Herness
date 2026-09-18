@@ -1,6 +1,6 @@
 # 홈 네트워크 VPN — Tailscale
 
-상태: 배포 선언·인증 정보 등록 도구 준비 및 `operator-oauth` 등록 확인 완료. GitOps 배포와 실제 외부 VPN 접속 검증은 별도로 확인한다.
+상태: OAuth 등록·GitOps 배포·경로 승인·재시작 후 복구 및 외부 휴대폰의 홈 LAN 접속 확인 완료. 검증 기준일: 2026-09-18.
 
 2026-09-18 사전 검증: 기존 테스트와 인증 등록 도구 테스트 총 41개, 기존 앱 `validate --all`, 공식 Chart lint·렌더링, 공식 CRD 기반 Connector 스키마 검증, 실제 홈랩 API에서 Application·CRD server-side dry-run이 통과했다. 이 결과는 실제 VPN 접속 성공을 의미하지 않는다.
 
@@ -108,6 +108,18 @@ kubectl --context homelab -n tailscale rollout status deployment/operator --time
 외부 Wi-Fi도 `192.168.0.0/24`이면 주소 충돌이 생길 수 있다. 우선 셀룰러에서 시험하고, 반복되는 충돌은 홈 LAN 대역 변경이나 Tailscale 4via6 같은 별도 설계로 해결한다. 수동 공유기 포트 포워딩 없이 연결을 시도하며, 직접 연결이 어려우면 Tailscale 릴레이를 사용한다. 외부 연결을 제한하는 방화벽에서는 공식 문서의 outbound 요구사항을 확인한다.
 
 기존 `*.homelab.robinjoon.xyz` 이름을 내부 IP로 사용하려면 split DNS와 해당 DNS 서버의 VPN 접근을 별도로 구성한다. 이번 기본 구성은 IP 기반 홈 LAN 접근이며, 기존 DNS·공개 Ingress·앱 인증 설정은 유지한다.
+
+## 배포 검증 기록
+
+2026-09-18 홈랩에서 확인한 결과:
+
+- `tailscale-operator`와 `tailscale-router`: Argo CD `Synced / Healthy`, 동기화 성공.
+- Operator와 서브넷 라우터 Pod: `1/1 Running`.
+- Tailscale: `Running`, 온라인, `192.168.0.0/24`가 승인된 기본 경로로 표시됨.
+- 라우터 Pod 재시작: rollout 성공, 기존 Tailscale 주소와 승인 경로 유지.
+- VPN Pod → 홈 서버 `192.168.0.195:6443`, 공유기 `192.168.0.1:80`: TCP 연결 성공.
+- 기존 Application: 모두 `Synced / Healthy` 유지.
+- 외부 휴대폰 → 홈 LAN: 운영자가 집 Wi-Fi를 끈 셀룰러 + Tailscale 상태에서 `http://192.168.0.1` 공유기 화면이 열리는 것을 확인했다. 모든 LAN 장치의 개별 서비스까지 시험한 것은 아니다.
 
 ## 공식 참고 문서
 
