@@ -22,6 +22,7 @@ K3s 홈랩에서 AI 에이전트가 제한된 JSON 계약과 CLI만으로 애플
 - 공통 Helm Chart가 Deployment, Service, ConfigMap, Ingress, cert-manager Certificate, 선택적 CNPG Database를 렌더링합니다. 비공개 레지스트리는 기존 Secret을 `imagePullSecrets`로 참조할 수 있습니다.
 - PostgreSQL은 `database-system`의 CloudNativePG Cluster 하나와 공유 `defaultuser` 계정을 사용합니다. `database`를 선언한 앱의 모든 컨테이너에는 하네스가 올바른 FQDN의 `DB_HOST`를 자동으로 주입합니다. 앱별로 분리되는 것은 논리적 database 이름뿐이며, 앱별 DB 인스턴스, 계정, Secret, HA를 만들지 않습니다.
 - 자체 컨테이너 레지스트리는 일반 워크로드 계약 밖의 공통 인프라입니다. zot을 `registry-system`에 `replicaCount: 1`인 StatefulSet과 RWO PVC로 배포합니다.
+- 홈 LAN VPN은 Tailscale Operator와 서브넷 라우터를 별도 인프라 Application으로 관리합니다. 초기 인증 등록과 배포·접속 검증은 [VPN 운영 절차](docs/VPN.md)를 따릅니다.
 - Argo CD App-of-Apps가 Git 변경을 동기화하고 prune/self-heal을 수행합니다.
 
 개인용 공통 GitHub Action은 [load-ci-secrets](.github/actions/load-ci-secrets/action.yml)에 구현되어 있으며 실행 의존성을 포함한 번들을 함께 관리합니다. Secret Manage System(시크릿 관리 앱)은 `https://secrets.homelab.robinjoon.xyz`에 배포되어 있고 공통 Action은 `v1.0.0`으로 게시했습니다. 노션 블로그의 publish job은 SMS의 `zot`·`harness` 객체를 조회합니다. 설계는 CI 자격증명을 기존 공유 PostgreSQL의 전용 논리 DB에 한 번 보관하고, 허용된 레포가 앱 이름으로 조회하는 구조입니다. 앱별 Secret 권한 분리나 앱 실행용 Kubernetes Secret 등록은 하지 않으며, 셀프 호스팅 러너는 추가하지 않습니다.
@@ -58,7 +59,7 @@ workloads/            # CLI가 생성한 values.json
 
 레지스트리 주소는 `registry.homelab.robinjoon.xyz`입니다. 이 이름은 K3s의 모든 노드와 레지스트리를 사용하는 외부 클라이언트에서 Traefik 진입점을 가리켜야 합니다. 다른 주소를 사용하려면 `argocd/managed/apps/zot.yaml`의 Ingress host와 TLS host를 함께 변경하고 Git에 커밋하고 푸시한 뒤 연동을 시작합니다. Root Application은 로컬 파일이 아니라 원격 Git을 읽습니다.
 
-외부 접근은 라우터의 공개 포트 포워딩 대신 Tailscale이나 WireGuard와 split DNS를 사용하는 구성을 권장합니다. `letsencrypt-prod`는 공개 443 포트를 열지 않아도 인증서를 발급할 수 있도록 DNS-01 방식으로 구성합니다. zot의 Service는 `ClusterIP`으로 유지하고 NodePort나 LoadBalancer로 직접 노출하지 않습니다. Tailscale의 tailnet, 라우팅, ACL은 이 저장소 밖의 외부 네트워크 계층이며 zot의 TLS, 인증, 저장소 ACL을 대체하지 않습니다.
+외부 접근은 라우터의 공개 포트 포워딩 대신 Tailscale이나 WireGuard와 split DNS를 사용하는 구성을 권장합니다. `letsencrypt-prod`는 공개 443 포트를 열지 않아도 인증서를 발급할 수 있도록 DNS-01 방식으로 구성합니다. zot의 Service는 `ClusterIP`으로 유지하고 NodePort나 LoadBalancer로 직접 노출하지 않습니다. Tailscale Operator와 홈 LAN `192.168.0.0/24` 서브넷 라우터의 배포 선언은 하네스가 관리합니다. 계정·tailnet 접근 정책·경로 승인은 Tailscale에서 관리하며, VPN은 zot의 TLS·인증·저장소 ACL을 대체하지 않습니다. 설치와 인증 정보 등록은 [VPN 운영 절차](docs/VPN.md)를 참고합니다.
 
 ### 2. 레지스트리 자격 증명 Secret 생성
 

@@ -11,7 +11,7 @@
 
 주 배포 흐름은 `앱 소스 → 앱 CI → zot 이미지 발행 → 하네스 릴리스 요청 → 하네스 Git → Argo CD → k3s 앱 실행`이다. 운영자·에이전트는 구성 CLI로 배포 계약을 변경한다. 앱 CI는 릴리스 workflow로 기존 이미지 태그만 바꾼다. Argo CD가 읽는 것은 원격 Git이며 로컬 파일 수정이나 커밋만으로는 배포되지 않는다.
 
-k3s의 공통 서비스는 Argo CD(GitOps 동기화), zot(이미지), 공유 PostgreSQL/CNPG(DB), Kubernetes Secrets(실행 설정), cert-manager(TLS)이며 Traefik은 기본 앱 접속을 담당한다. SMS도 하네스로 배포하는 서비스다. 다이어그램에서는 이 서비스들을 내부 컨트롤러까지 나누지 않는다. DNS·외부 네트워크는 별도 계층이다.
+k3s의 공통 서비스는 Argo CD(GitOps 동기화), zot(이미지), 공유 PostgreSQL/CNPG(DB), Kubernetes Secrets(실행 설정), cert-manager(TLS)이며 Traefik은 기본 앱 접속을 담당한다. SMS도 하네스로 배포하는 서비스다. 다이어그램에서는 이 서비스들을 내부 컨트롤러까지 나누지 않는다. Tailscale 서브넷 라우터는 홈 LAN 접근용 별도 인프라 앱으로 배포하며 장애 복구용이 아니다. Tailscale 계정·tailnet 정책·DNS는 외부 계층에서 관리한다. VPN의 초기 인증 등록과 접속 검증 상태는 `docs/VPN.md`를 확인한다.
 
 CI와 앱 실행용 비밀은 다음처럼 구분한다.
 
@@ -28,6 +28,7 @@ CI와 앱 실행용 비밀은 다음처럼 구분한다.
 | 전체 관계·책임 경계 확인 | [전체 설계](SYSTEM_DESIGN.md) |
 | 앱 추가·배포 구성 수정 | [워크로드 스킬](skills/homelab-k3s-workloads/SKILL.md), [워크로드 계약](docs/WORKLOAD_PLATFORM.md) |
 | 하네스 CLI·Chart·공통 인프라 자체 개발 | [워크로드 계약](docs/WORKLOAD_PLATFORM.md), [운영 README](README.md)의 해당 절 |
+| 홈 네트워크 VPN 설치·인증·접속 확인 | [VPN 운영 절차](docs/VPN.md) |
 | SMS와의 연결·허용 정책 확인 | [SMS 외부 계약](docs/SECRET_MANAGE_SYSTEM.md); 내부 변경은 SMS 구현 저장소에서 수행 |
 | 공통 Action 수정·소비 앱 CI 연결 | [공통 Action](docs/GITHUB_ACTION.md) |
 

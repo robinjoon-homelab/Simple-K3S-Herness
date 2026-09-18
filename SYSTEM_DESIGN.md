@@ -151,10 +151,16 @@ flowchart TB
 
 - 앱 CI와 하네스 릴리스 job은 GitHub-hosted runner를 사용한다. 셀프 호스팅 러너는 운영하지 않는다.
 - 시크릿 관리 앱은 단일 인스턴스로 운영하며 기존 공유 PostgreSQL의 `secret_manage_system` 논리 DB를 사용한다. 별도 DB 인스턴스·계정·고가용성·자동 장애조치는 추가하지 않는다. 구체적인 저장 계약은 [저장 설계](docs/SECRET_MANAGE_SYSTEM.md)를 따른다.
-- 앱 CI에서 시크릿 관리 앱과 zot 양쪽으로 접속 가능해야 한다. OIDC와 네트워크 연결은 별개이며, 한쪽만 연결됐다고 전체 배포가 가능하지는 않다. 시크릿 관리 앱은 HTTPS를 사용한다. VPN을 추가한다면 네트워크 접근 수단으로 다루며 OIDC를 대체하지 않는다.
+- 앱 CI에서 시크릿 관리 앱과 zot 양쪽으로 접속 가능해야 한다. OIDC와 네트워크 연결은 별개이며, 한쪽만 연결됐다고 전체 배포가 가능하지는 않다. 시크릿 관리 앱은 HTTPS를 사용한다. 홈 LAN VPN은 Tailscale 서브넷 라우터를 별도 인프라 앱으로 선언하며 OIDC를 대체하지 않는다. 이 VPN은 개인 기기의 홈 LAN 접근용이다. 기존 GitHub-hosted runner의 공개 접근 경로를 VPN으로 전환하는 작업은 포함하지 않는다.
 - SMS 자체 CI는 서비스 중단 중에도 SMS를 배포할 수 있도록 GitHub Secrets를 유지한다. SMS를 사용하는 소비 앱 CI와 이 예외를 구분한다.
 - 시크릿 관리 앱이나 DB가 중단되면 새로운 CI 값 조회가 실패한다. 이미 실행 중인 앱은 이 서비스에 의존하지 않는다. 같은 job이 이미 받은 정적 자격증명이 서비스 중단만으로 무효화되지는 않는다.
 - 공유 DB 자격증명을 가진 신뢰된 앱과 클러스터 관리자는 저장된 CI 값을 직접 읽고 변경·삭제할 수 있다. 앱 간 격리를 줄이더라도 외부 접근 인증이나 비밀 값의 Git·로그 노출 방지는 유지한다.
+
+## 홈 LAN 접근용 VPN
+
+Tailscale Operator와 Connector는 하네스의 인프라 Application으로 관리한다. 외부 개인 기기에서 k3s 안의 단일 서브넷 라우터를 거쳐 `192.168.0.0/24` 전체로 접근한다. 계정과 tailnet 접근 정책·경로 승인은 Tailscale 관리 서비스가 소유하며, Operator OAuth 자격증명은 Git 밖의 Kubernetes Secret에 등록한다. SMS나 공유 DB를 사용하지 않는다.
+
+VPN은 장애 복구용이 아니며 k3s 중단 시 함께 중단된다. 일반 앱의 CLI·공통 Chart·CI 계약은 유지한다. 배포 선언 준비와 실제 접속 검증 상태는 [VPN 운영 절차](docs/VPN.md)에서 구분한다. 위 CI·SMS 중심 그림에는 VPN의 내부 구현을 추가하지 않으며, 전체 관계는 [대표 관계도](docs/diagrams/README.md)에 반영한다.
 
 ## 검토와 이후 동작 확인의 구분
 

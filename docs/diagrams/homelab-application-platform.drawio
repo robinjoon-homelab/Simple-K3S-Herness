@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net" agent="Codex" version="24.7.17" type="device">
   <diagram id="homelab-unified" name="홈랩 앱 운영 전체 구조">
-    <mxGraphModel dx="3540" dy="1890" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3540" pageHeight="1890" math="0" shadow="0" background="#FFFFFF">
+    <mxGraphModel dx="3540" dy="2350" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3540" pageHeight="2350" math="0" shadow="0" background="#FFFFFF">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -220,13 +220,13 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="note1" value="Traefik은 k3s의 기본 접속 기능에, Reflector는 실행용 시크릿 관리에 포함했습니다. CNPG와 PostgreSQL은 하나의 DB 서비스입니다." style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=17;fontColor=#475569;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry as="geometry" x="80" y="1750" width="3300" height="30" />
+          <mxGeometry as="geometry" x="80" y="2190" width="3300" height="30" />
         </mxCell>
-        <mxCell id="note2" value="SMS는 현재 PostgreSQL을 사용합니다. SMS의 Kubernetes Secret 직접 저장은 아직 구현되지 않았습니다." style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=17;fontColor=#475569;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry as="geometry" x="80" y="1785" width="3300" height="30" />
+        <mxCell id="note2" value="SMS는 PostgreSQL에 CI 비밀을 저장합니다. 홈 LAN VPN은 장애 복구용이 아니며, 계정·정책은 외부 Tailscale에서 관리합니다." style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=17;fontColor=#475569;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="80" y="2225" width="3300" height="30" />
         </mxCell>
         <mxCell id="legend" value="굵은 파랑: 주 배포 흐름  /  주황: 이미지 전달  /  보라: CI 인증·시크릿 조회  /  회색 점선: 운영자 작업  |  홈 k3s 배지: 클러스터 내부 서비스" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=16;fontColor=#475569;fontStyle=0;" vertex="1" parent="1">
-          <mxGeometry as="geometry" x="80" y="1825" width="3300" height="30" />
+          <mxGeometry as="geometry" x="80" y="2285" width="3300" height="30" />
         </mxCell>
         <mxCell id="op-apps" value="앱 사용" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=1;endArrow=block;endFill=1;endSize=10;strokeWidth=2;strokeColor=#94A3B8;dashed=1;fontFamily=Arial;fontSize=16;fontColor=#334155;labelBackgroundColor=#FFFFFF;labelWidth=190;align=center;verticalAlign=middle;whiteSpace=wrap;exitX=1.0;exitY=0.2857142857142857;exitPerimeter=0;entryX=0.47368421052631576;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="operator" target="apps">
           <mxGeometry as="geometry" x="0" y="0" relative="1">
@@ -248,6 +248,56 @@
               <mxPoint x="2800" y="560" />
             </Array>
             <mxPoint as="offset" x="-107.0" y="-30.0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vpn-client" value="&lt;div style=&quot;font-size:11px;font-weight:bold;color:#0F766E;margin-bottom:8px&quot;&gt;PERSON · 기기&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:bold;color:#0F172A;line-height:1.3&quot;&gt;개인 노트북·휴대폰&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#475569;line-height:1.5;margin-top:8px&quot;&gt;외부 네트워크에서 VPN 접속&lt;/div&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#F0FDFA;strokeColor=#5EEAD4;strokeWidth=1.5;align=left;verticalAlign=middle;spacing=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="140" y="1900" width="280" height="160" />
+        </mxCell>
+        <mxCell id="vpn" value="&lt;div style=&quot;font-size:11px;font-weight:bold;color:#0F766E;margin-bottom:8px&quot;&gt;홈 k3s&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:bold;color:#0F172A;line-height:1.3&quot;&gt;Tailscale VPN&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#475569;line-height:1.5;margin-top:8px&quot;&gt;홈 LAN 서브넷 라우터&lt;br&gt;홈 LAN 접근 · 장애 복구용 아님&lt;/div&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#F0FDFA;strokeColor=#5EEAD4;strokeWidth=1.5;align=left;verticalAlign=middle;spacing=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1100" y="1900" width="340" height="160" />
+        </mxCell>
+        <mxCell id="lan" value="&lt;div style=&quot;font-size:11px;font-weight:bold;color:#0F766E;margin-bottom:8px&quot;&gt;HOME LAN&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:bold;color:#0F172A;line-height:1.3&quot;&gt;홈 네트워크&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#475569;line-height:1.5;margin-top:8px&quot;&gt;192.168.0.0/24&lt;br&gt;홈 서버 · NAS · 기타 장치&lt;/div&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#F0FDFA;strokeColor=#5EEAD4;strokeWidth=1.5;align=left;verticalAlign=middle;spacing=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="2540" y="1900" width="340" height="160" />
+        </mxCell>
+        <mxCell id="tailnet" value="&lt;div style=&quot;font-size:11px;font-weight:bold;color:#0F766E;margin-bottom:8px&quot;&gt;EXTERNAL&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:bold;color:#0F172A;line-height:1.3&quot;&gt;Tailscale 관리 서비스&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#475569;line-height:1.5;margin-top:8px&quot;&gt;계정 · 기기 등록 · 접근 정책&lt;/div&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#F0FDFA;strokeColor=#5EEAD4;strokeWidth=1.5;align=left;verticalAlign=middle;spacing=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1740" y="1700" width="340" height="160" />
+        </mxCell>
+        <mxCell id="op-vpn-client" value="외부 기기 사용" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0F766E;fontFamily=Arial;fontSize=16;fontColor=#334155;labelBackgroundColor=#FFFFFF;labelWidth=190;align=center;whiteSpace=wrap;exitX=0;exitY=0.5;exitPerimeter=0;entryX=0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="operator" target="vpn-client">
+          <mxGeometry as="geometry" relative="1" x="0" y="0">
+            <Array as="points">
+              <mxPoint x="60" y="270" />
+              <mxPoint x="60" y="1980" />
+            </Array>
+            <mxPoint as="offset" x="120" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="client-vpn" value="암호화된 VPN 접속" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0F766E;fontFamily=Arial;fontSize=16;fontColor=#334155;labelBackgroundColor=#FFFFFF;labelWidth=190;align=center;whiteSpace=wrap;exitX=1;exitY=0.5;exitPerimeter=0;entryX=0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="vpn-client" target="vpn">
+          <mxGeometry as="geometry" relative="1" x="0" y="0">
+            <Array as="points" />
+            <mxPoint as="offset" x="0" y="-25" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vpn-lan" value="승인된 홈 LAN 경로" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0F766E;fontFamily=Arial;fontSize=16;fontColor=#334155;labelBackgroundColor=#FFFFFF;labelWidth=190;align=center;whiteSpace=wrap;exitX=1;exitY=0.5;exitPerimeter=0;entryX=0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="vpn" target="lan">
+          <mxGeometry as="geometry" relative="1" x="0" y="0">
+            <Array as="points" />
+            <mxPoint as="offset" x="0" y="-25" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tailnet-vpn" value="등록 · 정책" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0F766E;fontFamily=Arial;fontSize=16;fontColor=#334155;labelBackgroundColor=#FFFFFF;labelWidth=190;align=center;whiteSpace=wrap;exitX=0;exitY=0.5;exitPerimeter=0;entryX=0.3;entryY=0;entryPerimeter=0;" edge="1" parent="1" source="tailnet" target="vpn">
+          <mxGeometry as="geometry" relative="1" x="0" y="0">
+            <Array as="points">
+              <mxPoint x="1202" y="1780" />
+            </Array>
+            <mxPoint as="offset" x="0" y="-25" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="argo-vpn" value="VPN 선언 동기화" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0F766E;fontFamily=Arial;fontSize=16;fontColor=#334155;labelBackgroundColor=#FFFFFF;labelWidth=190;align=center;whiteSpace=wrap;exitX=0.9;exitY=1;exitPerimeter=0;entryX=0.8;entryY=0;entryPerimeter=0;" edge="1" parent="1" source="argo" target="vpn">
+          <mxGeometry as="geometry" relative="1" x="0" y="0">
+            <Array as="points">
+              <mxPoint x="2330" y="1880" />
+              <mxPoint x="1372" y="1880" />
+            </Array>
+            <mxPoint as="offset" x="110" y="-180" />
           </mxGeometry>
         </mxCell>
       </root>

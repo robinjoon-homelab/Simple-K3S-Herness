@@ -1,0 +1,12 @@
+apiVersion: tailscale.com/v1alpha1
+kind: Connector
+metadata:
+  name: homelab-lan
+spec:
+  replicas: 1
+  hostname: homelab-lan
+  tags:
+    - tag:k8s
+  subnetRouter:
+    advertiseRoutes:
+      - 192.168.0.0/24

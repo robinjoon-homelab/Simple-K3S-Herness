@@ -20,7 +20,7 @@ class PlatformTest(unittest.TestCase):
             platform.parse_image("nginx@sha256:abc")
 
     def test_validate_app_name_rejects_reserved_and_invalid_names(self):
-        for app_name in ("kube-system", "registry-system", "Uppercase", "ends-"):
+        for app_name in ("kube-system", "registry-system", "tailscale", "Uppercase", "ends-"):
             with self.assertRaises(SystemExit):
                 platform.validate_app_name(app_name)
 
