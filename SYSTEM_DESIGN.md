@@ -160,7 +160,7 @@ flowchart TB
 
 하네스 Git → Argo CD 연결에는 공용 Traefik의 HTTPS 정책도 포함한다. `traefik-policy` Application이 `infrastructure/traefik/resources.yaml`의 HelmChartConfig와 HSTS Middleware를 자동 동기화한다. k3s Helm Controller는 이 설정으로 Traefik을 갱신하고, Traefik은 일반 앱·Argo CD·레지스트리에 HTTP→HTTPS 443 전환과 HTTPS 응답의 HSTS를 공통 적용한다. 시스템 관계도의 서비스나 연결선을 늘리지 않는다.
 
-cert-manager는 기존 인증서 발급·갱신을 담당한다. 일반 앱 Chart는 HTTPS Ingress와 Certificate를 선언하고 앱별 HTTP Ingress·Middleware는 만들지 않는다. Argo CD 자신의 Ingress·서버 설정과 관리 주체는 유지하며 서버 재시작도 필요하지 않다. 정책 적용에는 Traefik의 자동 rollout이 따르고 일시적인 접속 영향이 있을 수 있다. Application 동기화와 Helm Controller의 적용·rollout 완료는 별도로 확인한다. [정책과 적용 확인](README.md#공용-traefik-https-정책)은 아직 실행하지 않은 배포 확인 절차를 설명한다.
+cert-manager는 기존 인증서 발급·갱신을 담당한다. 일반 앱 Chart는 HTTPS Ingress와 Certificate를 선언하고 앱별 HTTP Ingress·Middleware는 만들지 않는다. Argo CD 자신의 Ingress·서버 설정과 관리 주체는 유지하며 서버 재시작도 필요하지 않다. 정책 적용에는 Traefik의 자동 rollout이 따르고 일시적인 접속 영향이 있을 수 있다. Application 동기화와 Helm Controller의 적용·rollout 완료는 별도로 확인한다. 배포 확인 절차와 실제 검증 기록은 [정책과 적용 확인](README.md#공용-traefik-https-정책)을 따른다.
 
 ## 홈 LAN 접근용 VPN
 

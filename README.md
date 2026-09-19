@@ -84,7 +84,9 @@ curl --silent --show-error --output /dev/null --dump-header - \
   | awk '/^HTTP\// || tolower($0) ~ /^(location|strict-transport-security):/'
 ```
 
-HTTP는 301 또는 308로 같은 HTTPS 경로로 전환되어야 합니다. HTTPS는 인증서 검증에 성공하고 HSTS 헤더를 포함해야 하며, UI와 레지스트리 인증 동작도 기존대로 확인합니다. 위 절차는 이후 배포 시 수행할 확인으로 아직 실행하지 않았습니다. 로컬 선언·렌더링 검증은 실제 적용·외부 접속 확인과 구분합니다.
+HTTP는 301 또는 308로 같은 HTTPS 경로로 전환되어야 합니다. HTTPS는 인증서 검증에 성공하고 HSTS 헤더를 포함해야 하며, UI와 레지스트리 인증 동작도 기존대로 확인합니다. 로컬 선언·렌더링 검증은 실제 적용·외부 접속 확인과 구분합니다.
+
+2026-09-19에 `3d45736` 배포를 확인했습니다. Argo CD의 11개 Application이 모두 `Synced/Healthy`였고, Traefik Helm 작업과 rollout이 완료됐습니다. 일반 앱·Argo CD·레지스트리의 네 호스트 모두 HTTP 301 전환, 경로·쿼리 보존, HTTPS 인증서 검증과 HSTS를 확인했습니다. HTTPS 응답은 블로그·Argo CD 200, SMS 로그인 경로로 302, 비인증 레지스트리 `/v2/` 401이었습니다. 검사는 이 작업 머신에서 프록시 없이 공개 DNS 주소로 수행했으며, 별도 외부망이나 로그인 후 기능·이미지 push/pull까지 검증한 것은 아닙니다.
 
 ### 1. DNS와 외부 접근 준비
 
