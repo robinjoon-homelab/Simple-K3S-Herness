@@ -24,7 +24,7 @@ description: >
 - 공식 워크로드는 Deployment입니다.
 - 기존 registry Secret 이름을 `workload.imagePullSecrets`로 참조할 수 있습니다. 인증정보나 Secret 자체는 생성하지 않습니다.
 - ConfigMap, 환경변수, Secret/ConfigMap 참조, 볼륨과 마운트, Service, Ingress, cert-manager Certificate를 지원합니다.
-- Ingress를 선언하면 `tls.mode: cert-manager`가 필수이며 Ingress class는 `traefik`입니다. 공통 Chart가 같은 namespace의 Traefik Middleware로 HTTP 요청을 HTTPS로 전환하고 HTTPS 경로에서만 앱 응답을 제공합니다. Ingress 없는 앱은 허용합니다. Traefik 사전 조건은 [워크로드 HTTPS 계약](../../docs/WORKLOAD_PLATFORM.md#워크로드-https-계약)을 확인합니다.
+- Ingress를 선언하면 `tls.mode: cert-manager`가 필수이며 Ingress class는 `traefik`입니다. 공통 Chart는 `websecure`의 HTTPS Ingress와 Certificate를 만들고, 공용 `traefik-policy`가 HTTP→HTTPS 전환과 HSTS를 적용합니다. 앱별 HTTP Ingress나 Middleware는 만들지 않습니다. Ingress 없는 앱은 허용합니다. Traefik 사전 조건은 [워크로드 HTTPS 계약](../../docs/WORKLOAD_PLATFORM.md#워크로드-https-계약)을 확인합니다.
 - DB는 공유 `shared-db` Cluster와 공유 `defaultuser`를 사용하며 `--db-name`은 논리적 database 이름을 분리하고 모든 컨테이너에 올바른 FQDN의 `DB_HOST`를 자동 주입합니다.
 
 ## 금지 사항

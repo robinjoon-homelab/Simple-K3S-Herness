@@ -39,7 +39,7 @@ Chart가 계약에 따라 다음 리소스를 렌더링한다.
 
 - Deployment
 - 선택적 Service, ConfigMap, Ingress
-- Ingress 선언 시 cert-manager Certificate와 Traefik Middleware
+- Ingress 선언 시 cert-manager Certificate
 - `database.name`이 있을 때 CNPG `Database`
 - `database.name`이 있을 때 모든 컨테이너에 플랫폼 관리 `DB_HOST` FQDN
 
@@ -51,11 +51,11 @@ Chart가 계약에 따라 다음 리소스를 렌더링한다.
 
 공통 Chart에 `ingresses`를 선언하면 각 Ingress는 `tls.mode: cert-manager`를 반드시 지정해야 하며 Ingress class는 `traefik`으로 고정한다. Ingress를 선언하지 않는 내부 앱은 허용한다. TLS 생략·비활성화나 다른 Ingress class로 HTTP 앱 응답을 허용하는 구성은 검증에 실패한다.
 
-Chart는 `web` entrypoint의 HTTP 리다이렉트용 Ingress와 `websecure` entrypoint의 TLS 앱 Ingress를 분리한다. HTTP 경로에는 같은 앱 namespace의 Traefik `Middleware` 두 개를 순서대로 연결한다. 첫 번째는 `X-Forwarded-Proto`를 `http`로 고정하고, 두 번째는 HTTPS의 외부 443 포트로 전환한다. 따라서 전달 헤더가 `https`라고 주장해도 HTTP 요청이 앱으로 통과하지 않는다. Middleware를 찾을 수 없으면 새 HTTP 라우터가 구성되지 않는다. HTTPS 강제 설정은 Chart가 관리하며 워크로드 annotations로 해제할 수 없다. TLS는 Traefik에서 종료하며 Service·Pod까지의 내부 통신을 TLS로 전환하는 계약은 아니다.
+Chart는 각 Ingress 선언에 대해 `websecure` entrypoint의 TLS Ingress 하나와 Certificate를 만든다. 기존 TLS Ingress·Certificate·Secret 이름은 유지한다. 앱별 HTTP Ingress·Traefik Middleware는 만들지 않으며 Ingress 이름은 63자 이하 DNS-1123 label이다. HTTPS 강제 설정은 워크로드 annotations로 해제할 수 없다. TLS는 Traefik에서 종료하며 Service·Pod까지의 내부 통신을 TLS로 전환하는 계약은 아니다.
 
-기존 TLS Ingress·Certificate·Secret 이름은 유지하고 HTTP Ingress에만 `-http` 접미사를 붙인다. Ingress 이름은 63자 이하 DNS-1123 label이며, `public`과 `public-http`처럼 생성되는 Ingress 이름이 겹치는 선언은 렌더 단계에서 거부한다.
+HTTP→HTTPS와 HSTS는 `default` Project의 `traefik-policy` Application이 관리하는 공통 인프라 정책이다. `infrastructure/traefik/resources.yaml`은 `kube-system/platform-https-headers` Middleware와 `kube-system/traefik` HelmChartConfig를 선언한다. HelmChartConfig는 `ports.web.http.redirections.entryPoint`로 `websecure`의 외부 443 포트에 영구 리다이렉트하고, `ports.websecure.http`에서 TLS와 공용 HSTS Middleware를 적용한다. HSTS는 `max-age=31536000`이며 `includeSubDomains`·`preload`는 사용하지 않는다. 이 정책은 일반 앱·Argo CD·레지스트리를 포함한 Traefik 웹 접속에 공통으로 적용한다. cert-manager는 기존 인증서 발급·갱신을 계속 담당한다.
 
-배포 전 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress provider와 Kubernetes CRD provider, `traefik.io` 그룹의 `Middleware` CRD가 준비되어 있어야 한다. cert-manager와 플랫폼에서 지정한 ClusterIssuer도 필요하다. 이 정책은 공통 워크로드 Chart가 생성하는 Ingress에 적용하며, Argo CD 자체 접속이나 Traefik 전역 설정을 변경하지 않는다. 로컬 `validate`·`render` 성공은 이 클러스터 사전 조건이나 실제 접속 검증을 대신하지 않는다.
+배포 전 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·CRD provider, `traefik.io`의 `Middleware` CRD와 k3s Helm Controller가 준비되어 있어야 한다. cert-manager와 플랫폼에서 지정한 ClusterIssuer도 필요하다. 공용 정책의 Application 동기화 이후 Helm Controller가 실제 Traefik 설정을 갱신하고 자동 rollout을 완료했는지 확인한다. Argo CD 서버 설정과 기존 리소스 관리 주체는 바뀌지 않고 서버 재시작도 필요하지 않다. 로컬 `validate`·`render` 성공은 정책 적용이나 실제 접속 검증을 대신하지 않는다. 적용 확인은 [README](../README.md#공용-traefik-https-정책)를 따른다.
 
 ## 3. 데이터베이스 모델
 
@@ -114,6 +114,6 @@ AI 에이전트는 구성 변경에 `release.py`를 사용하지 않고, 앱 CI�
 
 `homelab-workloads` AppProject는 소스 저장소를 이 저장소 URL(`https://github.com/robinjoon-homelab/Simple-K3S-Herness.git`)로 제한한다. 대상 서버는 기본 Kubernetes API 서버이며 앱마다 namespace가 달라 destinations의 `namespace: "*"`는 유지한다. 이는 모든 namespace에 임의로 배포한다는 운영 목표가 아니라, Child Application의 앱별 namespace를 하나의 Project에서 수용하기 위한 설정이다.
 
-워크로드 Project는 Namespace 생성과 공통 Chart가 직접 만드는 Deployment, Service, ConfigMap, Ingress, Traefik Middleware, cert-manager Certificate, CNPG Database를 허용한다. Argo CD 리소스 트리에서 컨트롤러가 만든 하위 리소스를 확인할 수 있도록 ReplicaSet, Pod, Secret, CertificateRequest, Order, Challenge도 허용한다. 이 하위 리소스들은 JSON Contract가 직접 생성하지 않는다.
+워크로드 Project는 Namespace 생성과 공통 Chart가 직접 만드는 Deployment, Service, ConfigMap, Ingress, cert-manager Certificate, CNPG Database를 허용한다. Argo CD 리소스 트리에서 컨트롤러가 만든 하위 리소스를 확인할 수 있도록 ReplicaSet, Pod, Secret, CertificateRequest, Order, Challenge도 허용한다. 이 하위 리소스들은 JSON Contract가 직접 생성하지 않는다. 기존 앱별 Traefik Middleware의 조회·정리를 위해 해당 허용 항목은 유지하지만 공통 Chart가 새 Middleware를 생성하지는 않는다.
 
-공유 CNPG Cluster, zot 레지스트리, Tailscale Operator·Connector 같은 인프라 리소스는 `default` Project의 인프라 Application과 Root Application이 관리하며, 워크로드 Project에는 이 리소스의 생성 권한을 주지 않는다. `platform/defaults.json`은 모든 앱 values보다 먼저 병합되고 워크로드 계약에서는 덮어쓸 수 없다.
+공유 CNPG Cluster, zot 레지스트리, Tailscale Operator·Connector, 공용 Traefik HTTPS 정책 같은 인프라 리소스는 `default` Project의 인프라 Application과 Root Application이 관리하며, 워크로드 Project에는 이 리소스의 생성 권한을 주지 않는다. `platform/defaults.json`은 모든 앱 values보다 먼저 병합되고 워크로드 계약에서는 덮어쓸 수 없다.

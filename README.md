@@ -19,11 +19,11 @@ K3s 홈랩에서 AI 에이전트가 제한된 JSON 계약과 CLI만으로 애플
 - 제1원칙은 **앱 간 격리 최소화**입니다. 단일 운영자의 앱들을 함께 신뢰하고 공통 인프라·계정·Secret을 공유합니다. 앱별 네임스페이스는 리소스 정리와 배포 관리에 사용하며, 엄격한 보안 격리를 목표로 하지 않습니다. 외부 접근 인증과 Secret의 Git·로그 노출 방지는 유지합니다.
 - 공식 워크로드 종류는 `Deployment` 하나입니다.
 - 앱마다 네임스페이스를 하나씩 사용합니다. 현재 계약은 앱 생성 시 앱 이름과 네임스페이스를 동일하게 만듭니다.
-- 공통 Helm Chart가 Deployment, Service, ConfigMap, Ingress, Traefik Middleware, cert-manager Certificate, 선택적 CNPG Database를 렌더링합니다. Ingress는 HTTPS를 강제하며 HTTP 요청은 HTTPS로 전환합니다. 비공개 레지스트리는 기존 Secret을 `imagePullSecrets`로 참조할 수 있습니다.
+- 공통 Helm Chart가 Deployment, Service, ConfigMap, HTTPS Ingress, cert-manager Certificate, 선택적 CNPG Database를 렌더링합니다. HTTP→HTTPS 전환과 HSTS는 공용 Traefik 정책으로 적용합니다. 비공개 레지스트리는 기존 Secret을 `imagePullSecrets`로 참조할 수 있습니다.
 - PostgreSQL은 `database-system`의 CloudNativePG Cluster 하나와 공유 `defaultuser` 계정을 사용합니다. `database`를 선언한 앱의 모든 컨테이너에는 하네스가 올바른 FQDN의 `DB_HOST`를 자동으로 주입합니다. 앱별로 분리되는 것은 논리적 database 이름뿐이며, 앱별 DB 인스턴스, 계정, Secret, HA를 만들지 않습니다.
 - 자체 컨테이너 레지스트리는 일반 워크로드 계약 밖의 공통 인프라입니다. zot을 `registry-system`에 `replicaCount: 1`인 StatefulSet과 RWO PVC로 배포합니다.
 - 홈 LAN VPN은 Tailscale Operator와 서브넷 라우터를 별도 인프라 Application으로 관리합니다. 초기 인증 등록과 배포·접속 검증은 [VPN 운영 절차](docs/VPN.md)를 따릅니다.
-- Argo CD App-of-Apps가 Git 변경을 동기화하고 prune/self-heal을 수행합니다.
+- Argo CD App-of-Apps가 Git 변경을 동기화합니다. 일반 앱에는 prune/self-heal을 적용하고, 공용 Traefik HTTPS 정책은 `traefik-policy` Application으로 관리합니다. 이 Application은 자동 동기화와 self-heal을 사용하며 prune은 끕니다. [정책과 적용 확인](#공용-traefik-https-정책)을 따릅니다.
 
 개인용 공통 GitHub Action은 [load-ci-secrets](.github/actions/load-ci-secrets/action.yml)에 구현되어 있으며 실행 의존성을 포함한 번들을 함께 관리합니다. Secret Manage System(시크릿 관리 앱)은 `https://secrets.homelab.robinjoon.xyz`에 배포되어 있고 공통 Action은 `v1.0.0`으로 게시했습니다. 노션 블로그의 publish job은 SMS의 `zot`·`harness` 객체를 조회합니다. 설계는 CI 자격증명을 기존 공유 PostgreSQL의 전용 논리 DB에 한 번 보관하고, 허용된 레포가 앱 이름으로 조회하는 구조입니다. 앱별 Secret 권한 분리나 앱 실행용 Kubernetes Secret 등록은 하지 않으며, 셀프 호스팅 러너는 추가하지 않습니다.
 
@@ -55,7 +55,36 @@ workloads/            # CLI가 생성한 values.json
 
 클러스터에는 Argo CD, Traefik, cert-manager와 `letsencrypt-prod` ClusterIssuer가 먼저 준비되어 있어야 합니다. Root Application은 CNPG, Reflector, 공유 DB, zot과 레지스트리 NetworkPolicy를 설치합니다.
 
-공통 워크로드의 HTTPS 강제 정책에는 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·Kubernetes CRD provider와 `traefik.io`의 `Middleware` CRD가 필요합니다. Chart는 앱 namespace의 HTTP 리다이렉트와 HTTPS 앱 경로를 분리하며, Argo CD 자체 접속이나 Traefik 전역 설정을 변경하지 않습니다. [워크로드 HTTPS 계약](docs/WORKLOAD_PLATFORM.md#워크로드-https-계약)을 참고합니다.
+공통 워크로드의 HTTPS 강제 정책에는 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·Kubernetes CRD provider와 `traefik.io`의 `Middleware` CRD가 필요합니다. Chart는 `websecure`의 TLS Ingress와 Certificate를 만들고, `infrastructure/traefik`의 공용 정책이 HTTP 리다이렉트와 HSTS를 담당합니다. [워크로드 HTTPS 계약](docs/WORKLOAD_PLATFORM.md#워크로드-https-계약)을 참고합니다.
+
+### 공용 Traefik HTTPS 정책
+
+`traefik-policy` Application이 `infrastructure/traefik/resources.yaml`을 자동 동기화합니다. `kube-system`의 `platform-https-headers` Middleware를 먼저 준비하고 `traefik` HelmChartConfig로 공용 entrypoint 정책을 설정합니다. `web` 요청은 HTTPS 443으로 영구 리다이렉트하고, `websecure`는 TLS와 `Strict-Transport-Security: max-age=31536000`을 기본 적용합니다. `includeSubDomains`·`preload`는 사용하지 않습니다. 일반 앱·Argo CD·레지스트리를 포함한 Traefik의 웹 접속에 공통으로 적용됩니다.
+
+인증서 발급·갱신은 기존 cert-manager가 담당합니다. 일반 앱 Chart는 HTTPS Ingress와 Certificate만 만들며 앱별 HTTP Ingress·Middleware를 만들지 않습니다. Argo CD의 기존 Ingress·서버 설정과 관리 주체는 유지하고, **Argo CD 서버 재시작은 필요하지 않습니다.**
+
+커밋·push 후 `root-apps`가 정책 Application을 등록하고, k3s Helm Controller가 HelmChartConfig를 읽어 Traefik Deployment를 갱신합니다. 정적 설정 변경에 따른 자동 rollout 중 일시적인 접속 영향이 있을 수 있습니다. **Application의 `Synced`는 HelmChartConfig 동기화이며 Helm 적용 완료를 뜻하지 않습니다.** 아래에서 동기화 커밋과 Traefik의 실제 실행 인자가 새 정책으로 바뀌었는지 확인한 다음 rollout 완료를 확인합니다. 인자가 아직 이전 값이면 Helm Controller의 적용을 기다립니다.
+
+```bash
+kubectl --context homelab -n argocd get application traefik-policy \
+  -o jsonpath='{.status.sync.status}{"\n"}{.status.sync.revision}{"\n"}'
+kubectl --context homelab -n kube-system get deployment traefik \
+  -o jsonpath='{.spec.template.spec.containers[*].args}{"\n"}'
+kubectl --context homelab -n kube-system rollout status deployment/traefik --timeout=5m
+```
+
+실행 인자에는 `web` 리다이렉트 대상 `:443`, scheme `https`, permanent `true`와 `websecure`의 TLS·`kube-system-platform-https-headers@kubernetescrd` Middleware가 있어야 합니다. 적용 후 외부 클라이언트에서 다음처럼 상태·접속 정책 헤더만 확인하고 일반 앱·Argo CD·레지스트리 주소에 반복합니다.
+
+```bash
+curl --silent --show-error --output /dev/null --dump-header - \
+  http://homelab.robinjoon.xyz/argocd/ \
+  | awk '/^HTTP\// || tolower($0) ~ /^(location|strict-transport-security):/'
+curl --silent --show-error --output /dev/null --dump-header - \
+  https://homelab.robinjoon.xyz/argocd/ \
+  | awk '/^HTTP\// || tolower($0) ~ /^(location|strict-transport-security):/'
+```
+
+HTTP는 301 또는 308로 같은 HTTPS 경로로 전환되어야 합니다. HTTPS는 인증서 검증에 성공하고 HSTS 헤더를 포함해야 하며, UI와 레지스트리 인증 동작도 기존대로 확인합니다. 위 절차는 이후 배포 시 수행할 확인으로 아직 실행하지 않았습니다. 로컬 선언·렌더링 검증은 실제 적용·외부 접속 확인과 구분합니다.
 
 ### 1. DNS와 외부 접근 준비
 

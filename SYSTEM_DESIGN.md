@@ -156,6 +156,12 @@ flowchart TB
 - 시크릿 관리 앱이나 DB가 중단되면 새로운 CI 값 조회가 실패한다. 이미 실행 중인 앱은 이 서비스에 의존하지 않는다. 같은 job이 이미 받은 정적 자격증명이 서비스 중단만으로 무효화되지는 않는다.
 - 공유 DB 자격증명을 가진 신뢰된 앱과 클러스터 관리자는 저장된 CI 값을 직접 읽고 변경·삭제할 수 있다. 앱 간 격리를 줄이더라도 외부 접근 인증이나 비밀 값의 Git·로그 노출 방지는 유지한다.
 
+## 공용 Traefik HTTPS 정책
+
+하네스 Git → Argo CD 연결에는 공용 Traefik의 HTTPS 정책도 포함한다. `traefik-policy` Application이 `infrastructure/traefik/resources.yaml`의 HelmChartConfig와 HSTS Middleware를 자동 동기화한다. k3s Helm Controller는 이 설정으로 Traefik을 갱신하고, Traefik은 일반 앱·Argo CD·레지스트리에 HTTP→HTTPS 443 전환과 HTTPS 응답의 HSTS를 공통 적용한다. 시스템 관계도의 서비스나 연결선을 늘리지 않는다.
+
+cert-manager는 기존 인증서 발급·갱신을 담당한다. 일반 앱 Chart는 HTTPS Ingress와 Certificate를 선언하고 앱별 HTTP Ingress·Middleware는 만들지 않는다. Argo CD 자신의 Ingress·서버 설정과 관리 주체는 유지하며 서버 재시작도 필요하지 않다. 정책 적용에는 Traefik의 자동 rollout이 따르고 일시적인 접속 영향이 있을 수 있다. Application 동기화와 Helm Controller의 적용·rollout 완료는 별도로 확인한다. [정책과 적용 확인](README.md#공용-traefik-https-정책)은 아직 실행하지 않은 배포 확인 절차를 설명한다.
+
 ## 홈 LAN 접근용 VPN
 
 Tailscale Operator와 Connector는 하네스의 인프라 Application으로 관리한다. 외부 개인 기기에서 k3s 안의 단일 서브넷 라우터를 거쳐 `192.168.0.0/24` 전체로 접근한다. 계정과 tailnet 접근 정책·경로 승인은 Tailscale 관리 서비스가 소유하며, Operator OAuth 자격증명은 Git 밖의 Kubernetes Secret에 등록한다. SMS나 공유 DB를 사용하지 않는다.

@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik-policy
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/robinjoon-homelab/Simple-K3S-Herness.git
+    targetRevision: main
+    path: infrastructure/traefik
+    directory:
+      include: resources.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - FailOnSharedResource=true

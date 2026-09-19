@@ -5,43 +5,33 @@
 {{- fail "Every workload ingress requires tls.mode=cert-manager; HTTP application access is not supported." }}
 {{- end }}
 {{- $name := printf "%s-%s" $.Values.metadata.name .name }}
-{{- range (list $name (printf "%s-http" $name)) }}
-{{- if hasKey $names . }}
-{{- fail (printf "Generated Ingress name collision: %s" .) }}
+{{- if hasKey $names $name }}
+{{- fail (printf "Duplicate Ingress name: %s" $name) }}
 {{- end }}
-{{- $_ := set $names . true }}
-{{- end }}
+{{- $_ := set $names $name true }}
 {{- end }}
 {{- range .Values.ingresses }}
 {{- $ingress := . }}
 {{- $name := printf "%s-%s" $.Values.metadata.name .name }}
-{{- range $https := list true false }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ ternary $name (printf "%s-http" $name) $https | quote }}
+  name: {{ $name | quote }}
   namespace: {{ $.Values.metadata.namespace | quote }}
   annotations:
-    {{- if $https }}
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    {{- else }}
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-http-scheme@kubernetescrd,%s-%s-https-redirect@kubernetescrd" $.Values.metadata.namespace $.Values.metadata.name $.Values.metadata.namespace $.Values.metadata.name | quote }}
-    {{- end }}
 spec:
   ingressClassName: traefik
-  {{- if $https }}
   tls:
     - hosts:
-      {{- range $ingress.rules }}
+      {{- range .rules }}
         - {{ .host | quote }}
       {{- end }}
       secretName: {{ printf "%s-tls" $name | quote }}
-  {{- end }}
   rules:
-  {{- range $ingress.rules }}
+  {{- range .rules }}
     - host: {{ .host | quote }}
       http:
         paths:
@@ -55,5 +45,4 @@ spec:
                   name: {{ .servicePort | quote }}
         {{- end }}
   {{- end }}
-{{- end }}
 {{- end }}
