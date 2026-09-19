@@ -1,38 +1,59 @@
-{{- $platform := index .Values "platform" | default dict }}
-{{- $ingressDefaults := index $platform "ingress" | default dict }}
+{{- $names := dict }}
+{{- range .Values.ingresses }}
+{{- $tls := .tls | default dict }}
+{{- if ne (get $tls "mode") "cert-manager" }}
+{{- fail "Every workload ingress requires tls.mode=cert-manager; HTTP application access is not supported." }}
+{{- end }}
+{{- $name := printf "%s-%s" $.Values.metadata.name .name }}
+{{- range (list $name (printf "%s-http" $name)) }}
+{{- if hasKey $names . }}
+{{- fail (printf "Generated Ingress name collision: %s" .) }}
+{{- end }}
+{{- $_ := set $names . true }}
+{{- end }}
+{{- end }}
 {{- range .Values.ingresses }}
 {{- $ingress := . }}
+{{- $name := printf "%s-%s" $.Values.metadata.name .name }}
+{{- range $https := list true false }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ $.Values.metadata.name }}-{{ .name }}
-  namespace: {{ $.Values.metadata.namespace }}
+  name: {{ ternary $name (printf "%s-http" $name) $https | quote }}
+  namespace: {{ $.Values.metadata.namespace | quote }}
+  annotations:
+    {{- if $https }}
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    {{- else }}
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-http-scheme@kubernetescrd,%s-%s-https-redirect@kubernetescrd" $.Values.metadata.namespace $.Values.metadata.name $.Values.metadata.namespace $.Values.metadata.name | quote }}
+    {{- end }}
 spec:
-  {{- with (index $ingressDefaults "className") }}
-  ingressClassName: {{ . }}
-  {{- end }}
-  {{- if and .tls (eq .tls.mode "cert-manager") }}
+  ingressClassName: traefik
+  {{- if $https }}
   tls:
     - hosts:
-      {{- range .rules }}
-        - {{ .host }}
+      {{- range $ingress.rules }}
+        - {{ .host | quote }}
       {{- end }}
-      secretName: {{ $.Values.metadata.name }}-{{ .name }}-tls
+      secretName: {{ printf "%s-tls" $name | quote }}
   {{- end }}
   rules:
-  {{- range .rules }}
-    - host: {{ .host }}
+  {{- range $ingress.rules }}
+    - host: {{ .host | quote }}
       http:
         paths:
         {{- range .paths }}
-          - path: {{ .path }}
+          - path: {{ .path | quote }}
             pathType: Prefix
             backend:
               service:
-                name: {{ $.Values.metadata.name }}-{{ $ingress.service }}
+                name: {{ printf "%s-%s" $.Values.metadata.name $ingress.service | quote }}
                 port:
-                  name: {{ .servicePort }}
+                  name: {{ .servicePort | quote }}
         {{- end }}
   {{- end }}
+{{- end }}
 {{- end }}

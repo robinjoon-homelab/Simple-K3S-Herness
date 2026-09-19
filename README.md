@@ -19,7 +19,7 @@ K3s 홈랩에서 AI 에이전트가 제한된 JSON 계약과 CLI만으로 애플
 - 제1원칙은 **앱 간 격리 최소화**입니다. 단일 운영자의 앱들을 함께 신뢰하고 공통 인프라·계정·Secret을 공유합니다. 앱별 네임스페이스는 리소스 정리와 배포 관리에 사용하며, 엄격한 보안 격리를 목표로 하지 않습니다. 외부 접근 인증과 Secret의 Git·로그 노출 방지는 유지합니다.
 - 공식 워크로드 종류는 `Deployment` 하나입니다.
 - 앱마다 네임스페이스를 하나씩 사용합니다. 현재 계약은 앱 생성 시 앱 이름과 네임스페이스를 동일하게 만듭니다.
-- 공통 Helm Chart가 Deployment, Service, ConfigMap, Ingress, cert-manager Certificate, 선택적 CNPG Database를 렌더링합니다. 비공개 레지스트리는 기존 Secret을 `imagePullSecrets`로 참조할 수 있습니다.
+- 공통 Helm Chart가 Deployment, Service, ConfigMap, Ingress, Traefik Middleware, cert-manager Certificate, 선택적 CNPG Database를 렌더링합니다. Ingress는 HTTPS를 강제하며 HTTP 요청은 HTTPS로 전환합니다. 비공개 레지스트리는 기존 Secret을 `imagePullSecrets`로 참조할 수 있습니다.
 - PostgreSQL은 `database-system`의 CloudNativePG Cluster 하나와 공유 `defaultuser` 계정을 사용합니다. `database`를 선언한 앱의 모든 컨테이너에는 하네스가 올바른 FQDN의 `DB_HOST`를 자동으로 주입합니다. 앱별로 분리되는 것은 논리적 database 이름뿐이며, 앱별 DB 인스턴스, 계정, Secret, HA를 만들지 않습니다.
 - 자체 컨테이너 레지스트리는 일반 워크로드 계약 밖의 공통 인프라입니다. zot을 `registry-system`에 `replicaCount: 1`인 StatefulSet과 RWO PVC로 배포합니다.
 - 홈 LAN VPN은 Tailscale Operator와 서브넷 라우터를 별도 인프라 Application으로 관리합니다. 초기 인증 등록과 배포·접속 검증은 [VPN 운영 절차](docs/VPN.md)를 따릅니다.
@@ -54,6 +54,8 @@ workloads/            # CLI가 생성한 values.json
 ## 초기 연동
 
 클러스터에는 Argo CD, Traefik, cert-manager와 `letsencrypt-prod` ClusterIssuer가 먼저 준비되어 있어야 합니다. Root Application은 CNPG, Reflector, 공유 DB, zot과 레지스트리 NetworkPolicy를 설치합니다.
+
+공통 워크로드의 HTTPS 강제 정책에는 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·Kubernetes CRD provider와 `traefik.io`의 `Middleware` CRD가 필요합니다. Chart는 앱 namespace의 HTTP 리다이렉트와 HTTPS 앱 경로를 분리하며, Argo CD 자체 접속이나 Traefik 전역 설정을 변경하지 않습니다. [워크로드 HTTPS 계약](docs/WORKLOAD_PLATFORM.md#워크로드-https-계약)을 참고합니다.
 
 ### 1. DNS와 외부 접근 준비
 
@@ -259,6 +261,8 @@ python3 tools/platform.py render my-api
 ```
 
 `--db-name`을 지정하면 공유 `shared-db` Cluster 안에 해당 논리적 database를 선언하고 모든 컨테이너에 `DB_HOST=shared-db-rw.database-system.svc.cluster.local`을 기존 환경변수보다 먼저 주입합니다. `DB_HOST`는 플랫폼 예약 이름이므로 database 워크로드가 직접 정의하면 검증에 실패합니다. 복제된 `shared-db-app`의 `host`나 연결 URI 대신 이 환경변수를 사용합니다. 그 밖의 환경변수, ConfigMap, Secret 참조, 볼륨 마운트, Service, Ingress, cert-manager TLS는 JSON 계약이 허용하는 범위에서 설정할 수 있습니다. 평문 Secret 값은 Git에 저장하지 않습니다.
+
+`ingresses`를 선언하면 각 항목의 `tls.mode`는 `cert-manager`, Ingress class는 `traefik`이어야 합니다. TLS 생략·비활성화나 annotations로 HTTPS 강제 설정을 해제할 수 없습니다. Ingress가 없는 앱도 생성할 수 있습니다.
 
 자체 레지스트리 이미지를 사용할 때는 Reflector가 앱 네임스페이스에 복제한 `registry-credentials`를 이름으로만 참조합니다.
 

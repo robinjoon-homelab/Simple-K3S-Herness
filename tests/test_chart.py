@@ -74,7 +74,7 @@ class ChartRenderTest(unittest.TestCase):
         self.assertIn("kind: Ingress", manifests)
         self.assertIn("ingressClassName: traefik", manifests)
         self.assertIn("secretName: sample-public-tls", manifests)
-        self.assertIn("name: sample-web\n                port:\n                  name: http", manifests)
+        self.assertIn('name: "sample-web"\n                port:\n                  name: "http"', manifests)
         self.assertIn("kind: Certificate", manifests)
         self.assertIn("name: letsencrypt-prod", manifests)
         self.assertIn("kind: ClusterIssuer", manifests)

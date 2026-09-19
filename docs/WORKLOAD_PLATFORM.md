@@ -39,13 +39,23 @@ Chart가 계약에 따라 다음 리소스를 렌더링한다.
 
 - Deployment
 - 선택적 Service, ConfigMap, Ingress
-- 선택적 cert-manager Certificate
+- Ingress 선언 시 cert-manager Certificate와 Traefik Middleware
 - `database.name`이 있을 때 CNPG `Database`
 - `database.name`이 있을 때 모든 컨테이너에 플랫폼 관리 `DB_HOST` FQDN
 
 워크로드 계약에는 컨테이너 이미지/포트, replicas, 기존 registry Secret을 가리키는 `imagePullSecrets`, 환경변수와 ConfigMap·Secret 참조, 볼륨·마운트, 서비스·Ingress·TLS, 논리적 database 이름이 포함된다. Database 워크로드의 `DB_HOST`는 플랫폼 예약 이름이며 워크로드 values에서 직접 정의할 수 없다. StatefulSet, DaemonSet, CronJob, 임의 raw manifest, existing-secret TLS 모드는 공식 계약이 아니다.
 
 `imagePullSecrets`는 Secret 이름만 받는다. 레지스트리 사용자 이름, 비밀번호, 토큰은 values에 저장하지 않으며, 워크로드는 Reflector가 미리 복제한 `registry-credentials` Secret의 이름만 참조한다.
+
+### 워크로드 HTTPS 계약
+
+공통 Chart에 `ingresses`를 선언하면 각 Ingress는 `tls.mode: cert-manager`를 반드시 지정해야 하며 Ingress class는 `traefik`으로 고정한다. Ingress를 선언하지 않는 내부 앱은 허용한다. TLS 생략·비활성화나 다른 Ingress class로 HTTP 앱 응답을 허용하는 구성은 검증에 실패한다.
+
+Chart는 `web` entrypoint의 HTTP 리다이렉트용 Ingress와 `websecure` entrypoint의 TLS 앱 Ingress를 분리한다. HTTP 경로에는 같은 앱 namespace의 Traefik `Middleware` 두 개를 순서대로 연결한다. 첫 번째는 `X-Forwarded-Proto`를 `http`로 고정하고, 두 번째는 HTTPS의 외부 443 포트로 전환한다. 따라서 전달 헤더가 `https`라고 주장해도 HTTP 요청이 앱으로 통과하지 않는다. Middleware를 찾을 수 없으면 새 HTTP 라우터가 구성되지 않는다. HTTPS 강제 설정은 Chart가 관리하며 워크로드 annotations로 해제할 수 없다. TLS는 Traefik에서 종료하며 Service·Pod까지의 내부 통신을 TLS로 전환하는 계약은 아니다.
+
+기존 TLS Ingress·Certificate·Secret 이름은 유지하고 HTTP Ingress에만 `-http` 접미사를 붙인다. Ingress 이름은 63자 이하 DNS-1123 label이며, `public`과 `public-http`처럼 생성되는 Ingress 이름이 겹치는 선언은 렌더 단계에서 거부한다.
+
+배포 전 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress provider와 Kubernetes CRD provider, `traefik.io` 그룹의 `Middleware` CRD가 준비되어 있어야 한다. cert-manager와 플랫폼에서 지정한 ClusterIssuer도 필요하다. 이 정책은 공통 워크로드 Chart가 생성하는 Ingress에 적용하며, Argo CD 자체 접속이나 Traefik 전역 설정을 변경하지 않는다. 로컬 `validate`·`render` 성공은 이 클러스터 사전 조건이나 실제 접속 검증을 대신하지 않는다.
 
 ## 3. 데이터베이스 모델
 
@@ -104,6 +114,6 @@ AI 에이전트는 구성 변경에 `release.py`를 사용하지 않고, 앱 CI�
 
 `homelab-workloads` AppProject는 소스 저장소를 이 저장소 URL(`https://github.com/robinjoon-homelab/Simple-K3S-Herness.git`)로 제한한다. 대상 서버는 기본 Kubernetes API 서버이며 앱마다 namespace가 달라 destinations의 `namespace: "*"`는 유지한다. 이는 모든 namespace에 임의로 배포한다는 운영 목표가 아니라, Child Application의 앱별 namespace를 하나의 Project에서 수용하기 위한 설정이다.
 
-워크로드 Project는 Namespace 생성과 공통 Chart가 직접 만드는 Deployment, Service, ConfigMap, Ingress, cert-manager Certificate, CNPG Database를 허용한다. Argo CD 리소스 트리에서 컨트롤러가 만든 하위 리소스를 확인할 수 있도록 ReplicaSet, Pod, Secret, CertificateRequest, Order, Challenge도 허용한다. 이 하위 리소스들은 JSON Contract가 직접 생성하지 않는다.
+워크로드 Project는 Namespace 생성과 공통 Chart가 직접 만드는 Deployment, Service, ConfigMap, Ingress, Traefik Middleware, cert-manager Certificate, CNPG Database를 허용한다. Argo CD 리소스 트리에서 컨트롤러가 만든 하위 리소스를 확인할 수 있도록 ReplicaSet, Pod, Secret, CertificateRequest, Order, Challenge도 허용한다. 이 하위 리소스들은 JSON Contract가 직접 생성하지 않는다.
 
 공유 CNPG Cluster, zot 레지스트리, Tailscale Operator·Connector 같은 인프라 리소스는 `default` Project의 인프라 Application과 Root Application이 관리하며, 워크로드 Project에는 이 리소스의 생성 권한을 주지 않는다. `platform/defaults.json`은 모든 앱 values보다 먼저 병합되고 워크로드 계약에서는 덮어쓸 수 없다.

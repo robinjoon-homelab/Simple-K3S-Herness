@@ -13,7 +13,7 @@ spec:
   secretName: {{ $.Values.metadata.name }}-{{ .name }}-tls
   dnsNames:
   {{- range .rules }}
-    - {{ .host }}
+    - {{ .host | quote }}
   {{- end }}
   issuerRef:
     name: {{ index $issuerRef "name" }}

@@ -340,11 +340,15 @@
         "required": [
           "name",
           "service",
-          "rules"
+          "rules",
+          "tls"
         ],
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
           },
           "service": {
             "type": "string"
@@ -379,10 +383,12 @@
                         "type": "string"
                       }
                     }
-                  }
+                  },
+                  "minItems": 1
                 }
               }
-            }
+            },
+            "minItems": 1
           },
           "tls": {
             "type": "object",
@@ -394,7 +400,11 @@
                   "cert-manager"
                 ]
               }
-            }
+            },
+            "required": [
+              "mode"
+            ],
+            "description": "Required for every ingress. Workloads are HTTPS-only; HTTP requests are redirected by the platform."
           }
         }
       }
@@ -421,7 +431,8 @@
           "additionalProperties": false,
           "properties": {
             "className": {
-              "type": "string"
+              "type": "string",
+              "const": "traefik"
             }
           }
         },

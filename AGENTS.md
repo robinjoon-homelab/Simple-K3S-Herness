@@ -13,6 +13,8 @@
 
 k3s의 공통 서비스는 Argo CD(GitOps 동기화), zot(이미지), 공유 PostgreSQL/CNPG(DB), Kubernetes Secrets(실행 설정), cert-manager(TLS)이며 Traefik은 기본 앱 접속을 담당한다. SMS도 하네스로 배포하는 서비스다. 다이어그램에서는 이 서비스들을 내부 컨트롤러까지 나누지 않는다. Tailscale 서브넷 라우터는 홈 LAN 접근용 별도 인프라 앱으로 배포하며 장애 복구용이 아니다. Tailscale 계정·tailnet 정책·DNS는 외부 계층에서 관리한다. VPN의 초기 인증 등록과 접속 검증 상태는 `docs/VPN.md`를 확인한다.
 
+공통 워크로드 Chart의 Ingress는 Traefik과 cert-manager TLS를 필수로 사용한다. HTTP 요청은 HTTPS로 전환하고 앱 응답은 HTTPS 경로에서만 제공하며, 워크로드 values로 이 정책을 해제할 수 없다. Ingress가 없는 내부 앱은 계속 지원한다. 상세 계약과 Traefik 사전 조건은 `docs/WORKLOAD_PLATFORM.md`를 따른다.
+
 CI와 앱 실행용 비밀은 다음처럼 구분한다.
 
 - 공통 Action은 **호출 앱의 GitHub-hosted runner job 안에서** 실행된다. GitHub OIDC로 호출 레포의 실행 신원을 증명하고 `https://secrets.homelab.robinjoon.xyz`의 SMS에서 CI 자격증명을 조회해 같은 job의 후속 step에 환경변수로 전달한다. 별도 러너 인프라나 컨테이너 서버가 아니다.
