@@ -3,17 +3,17 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.Values.metadata.name }}-{{ .name }}
-  namespace: {{ $.Values.metadata.namespace }}
+  name: {{ printf "%s-%s" $.Values.metadata.name .name | quote }}
+  namespace: {{ $.Values.metadata.namespace | quote }}
   labels:
-    app.kubernetes.io/name: {{ $.Values.metadata.name }}
+    app.kubernetes.io/name: {{ $.Values.metadata.name | quote }}
 spec:
   selector:
-    app.kubernetes.io/name: {{ $.Values.metadata.name }}
+    app.kubernetes.io/name: {{ $.Values.metadata.name | quote }}
   ports:
   {{- range .ports }}
-    - name: {{ .name }}
+    - name: {{ .name | quote }}
       port: {{ .port }}
-      targetPort: {{ .targetPort }}
+      targetPort: {{ .targetPort | quote }}
   {{- end }}
 {{- end }}

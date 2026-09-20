@@ -108,7 +108,7 @@ class HttpsPolicyTest(unittest.TestCase):
         certificates = documents(manifests, "Certificate")
         self.assertEqual(len(certificates), 1)
         self.assertRegex(certificates[0], r'(?m)^  name: "?sample-public"?$')
-        self.assertIn("secretName: sample-public-tls", certificates[0])
+        self.assertRegex(certificates[0], r'secretName: "?sample-public-tls"?\s')
         self.assertIn("sample.example.test", certificates[0])
 
     def test_every_host_and_path_is_preserved_on_the_https_route(self):

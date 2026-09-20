@@ -68,28 +68,93 @@ class ChartRenderTest(unittest.TestCase):
         manifests = result.stdout
         self.assertIn("kind: Deployment", manifests)
         self.assertIn("replicas: 0", manifests)
-        self.assertIn("imagePullSecrets:\n        - name: registry-credentials", manifests)
+        self.assertIn('imagePullSecrets:\n        - name: "registry-credentials"', manifests)
         self.assertIn("kind: Service", manifests)
-        self.assertIn("name: sample-web", manifests)
+        self.assertIn('name: "sample-web"', manifests)
         self.assertIn("kind: Ingress", manifests)
         self.assertIn("ingressClassName: traefik", manifests)
-        self.assertIn("secretName: sample-public-tls", manifests)
+        self.assertIn('secretName: "sample-public-tls"', manifests)
         self.assertIn('name: "sample-web"\n                port:\n                  name: "http"', manifests)
         self.assertIn("kind: Certificate", manifests)
-        self.assertIn("name: letsencrypt-prod", manifests)
-        self.assertIn("kind: ClusterIssuer", manifests)
+        self.assertIn('name: "letsencrypt-prod"', manifests)
+        self.assertIn('kind: "ClusterIssuer"', manifests)
         self.assertIn("kind: ConfigMap", manifests)
-        self.assertIn("name: sample-settings", manifests)
-        self.assertIn("MODE: |\n    test", manifests)
+        self.assertIn('name: "sample-settings"', manifests)
+        self.assertIn('"MODE": "test"', manifests)
         self.assertIn("kind: Database", manifests)
         self.assertIn("namespace: database-system", manifests)
-        self.assertIn("name: sample_db", manifests)
-        self.assertIn("owner: defaultuser", manifests)
+        self.assertIn('name: "sample_db"', manifests)
+        self.assertIn('owner: "defaultuser"', manifests)
         self.assertIn(
             '- name: DB_HOST\n              value: "shared-db-rw.database-system.svc.cluster.local"',
             manifests,
         )
         self.assertEqual(manifests.count("- name: DB_HOST"), 2)
+
+
+    @unittest.skipUnless(shutil.which("helm"), "helm CLI is required")
+    def test_configmap_preserves_string_keys_and_values_after_yaml_parsing(self):
+        # JSON string literals are also YAML string scalars. Decode each data
+        # entry to check values without adding a Python dependency to the chart.
+        data = {
+            "EMPTY": "", "SPACES": "  value  ", "NEWLINES": "first\nsecond",
+            "TRAILING": "a\n\n", "NULL": "null", "true": "true",
+            "NUMBER": "00123", "SPECIAL": 'quote " backslash \\ tab\t',
+            "UNICODE": "한글 ☃",
+        }
+        values = {
+            "contractVersion": 1,
+            "metadata": {"name": "sample", "namespace": "sample"},
+            "workload": {"kind": "deployment", "containers": [{
+                "name": "app", "image": {"repository": "nginx", "tag": "1.27"},
+            }]},
+            "configMaps": [{"name": "settings", "data": data}],
+        }
+        for expected in (data, {}):
+            with self.subTest(data=expected):
+                values["configMaps"][0]["data"] = expected
+                rendered = render_chart(values)
+                self.assertEqual(rendered.returncode, 0, rendered.stderr)
+                configmap = next(part for part in rendered.stdout.split("---\n")
+                                 if "kind: ConfigMap\n" in part)
+                if expected:
+                    entries = configmap.split("\ndata:\n", 1)[1].splitlines()
+                    parsed = {}
+                    decoder = json.JSONDecoder()
+                    for entry in entries:
+                        if not entry.strip():
+                            continue
+                        line = entry.strip()
+                        key, end = decoder.raw_decode(line)
+                        self.assertEqual(line[end:end + 2], ": ")
+                        parsed[key] = json.loads(line[end + 2:])
+                    self.assertEqual(parsed, expected)
+                else:
+                    self.assertIn("data: {}", configmap)
+
+    @unittest.skipUnless(shutil.which("helm"), "helm CLI is required")
+    def test_yaml_scalar_like_names_and_paths_remain_strings(self):
+        values = {
+            "contractVersion": 1,
+            "metadata": {"name": "yes", "namespace": "yes"},
+            "workload": {"kind": "deployment", "containers": [{
+                "name": "true", "image": {"repository": "nginx", "tag": "1.27"},
+                "ports": [{"name": "null", "containerPort": 8080}],
+                "env": [
+                    {"name": "NULL", "value": ""},
+                    {"name": "TOKEN", "secretKeyRef": {"name": "true", "key": "false"}},
+                ],
+                "volumeMounts": [{"name": "false", "mountPath": "/a: b\nsecond", "subPath": "null"}],
+            }], "volumes": [{"name": "false", "secret": {"secretName": "true"}}]},
+        }
+        rendered = render_chart(values)
+        self.assertEqual(rendered.returncode, 0, rendered.stderr)
+        for expected in ('name: "yes"', 'namespace: "yes"', 'name: "true"',
+                         'name: "null"', 'key: "false"', 'subPath: "null"',
+                         'secretName: "true"', 'mountPath: "/a: b\\nsecond"'):
+            self.assertIn(expected, rendered.stdout)
+        self.assertIn('- name: "NULL"\n              value: ""', rendered.stdout)
+        self.assertIn('containerPort: 8080', rendered.stdout)
 
     @unittest.skipUnless(shutil.which("helm"), "helm CLI is required")
     def test_does_not_inject_database_host_without_database(self):
@@ -211,10 +276,10 @@ class ChartRenderTest(unittest.TestCase):
             '- name: DB_HOST\n              value: "shared-db-rw.database-system.svc.cluster.local"',
             result.stdout,
         )
-        self.assertLess(result.stdout.index("- name: DB_HOST"), result.stdout.index("- name: DB_PORT"))
+        self.assertLess(result.stdout.index("- name: DB_HOST"), result.stdout.index('- name: "DB_PORT"'))
         self.assertLess(
-            result.stdout.index("- name: DB_PORT"),
-            result.stdout.index("- name: SPRING_DATASOURCE_URL"),
+            result.stdout.index('- name: "DB_PORT"'),
+            result.stdout.index('- name: "SPRING_DATASOURCE_URL"'),
         )
 
     @unittest.skipUnless(shutil.which("helm"), "helm CLI is required")

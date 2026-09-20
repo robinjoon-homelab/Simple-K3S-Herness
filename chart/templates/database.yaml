@@ -2,11 +2,11 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: {{ .Values.metadata.name }}-db
+  name: {{ printf "%s-db" .Values.metadata.name | quote }}
   namespace: database-system
 spec:
-  name: {{ .Values.database.name }}
-  owner: {{ .Values.database.owner | default "defaultuser" }}
+  name: {{ .Values.database.name | quote }}
+  owner: {{ .Values.database.owner | default "defaultuser" | quote }}
   cluster:
     name: shared-db
 {{- end }}

@@ -2,34 +2,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.metadata.name }}
-  namespace: {{ .Values.metadata.namespace }}
+  name: {{ .Values.metadata.name | quote }}
+  namespace: {{ .Values.metadata.namespace | quote }}
   labels:
-    app.kubernetes.io/name: {{ .Values.metadata.name }}
+    app.kubernetes.io/name: {{ .Values.metadata.name | quote }}
 spec:
   replicas: {{ if hasKey .Values.workload "replicas" }}{{ .Values.workload.replicas }}{{ else }}1{{ end }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ .Values.metadata.name }}
+      app.kubernetes.io/name: {{ .Values.metadata.name | quote }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ .Values.metadata.name }}
+        app.kubernetes.io/name: {{ .Values.metadata.name | quote }}
     spec:
       {{- with .Values.workload.imagePullSecrets }}
       imagePullSecrets:
       {{- range . }}
-        - name: {{ .name }}
+        - name: {{ .name | quote }}
       {{- end }}
       {{- end }}
       containers:
       {{- range .Values.workload.containers }}
-        - name: {{ .name }}
-          image: "{{ .image.repository }}:{{ .image.tag }}"
+        - name: {{ .name | quote }}
+          image: {{ printf "%s:%s" .image.repository .image.tag | quote }}
           {{- if .ports }}
           ports:
           {{- range .ports }}
-            - name: {{ .name }}
+            - name: {{ .name | quote }}
               containerPort: {{ .containerPort }}
           {{- end }}
           {{- end }}
@@ -46,21 +46,21 @@ spec:
             {{- if and $.Values.database .secretKeyRef (eq .secretKeyRef.name "shared-db-app") (not (has .secretKeyRef.key (list "port" "username" "password"))) }}
               {{- fail "shared-db-app may only supply port, username, and password to database workloads" }}
             {{- end }}
-            - name: {{ .name }}
-              {{- if .value }}
+            - name: {{ .name | quote }}
+              {{- if hasKey . "value" }}
               value: {{ .value | quote }}
               {{- end }}
               {{- if .secretKeyRef }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ .secretKeyRef.name }}
-                  key: {{ .secretKeyRef.key }}
+                  name: {{ .secretKeyRef.name | quote }}
+                  key: {{ .secretKeyRef.key | quote }}
               {{- end }}
               {{- if .configMapKeyRef }}
               valueFrom:
                 configMapKeyRef:
-                  name: {{ $.Values.metadata.name }}-{{ .configMapKeyRef.name }}
-                  key: {{ .configMapKeyRef.key }}
+                  name: {{ printf "%s-%s" $.Values.metadata.name .configMapKeyRef.name | quote }}
+                  key: {{ .configMapKeyRef.key | quote }}
               {{- end }}
           {{- end }}
           {{- end }}
@@ -72,21 +72,21 @@ spec:
             {{- end }}
             {{- if .configMapRef }}
             - configMapRef:
-                name: {{ $.Values.metadata.name }}-{{ .configMapRef.name }}
+                name: {{ printf "%s-%s" $.Values.metadata.name .configMapRef.name | quote }}
             {{- end }}
             {{- if .secretRef }}
             - secretRef:
-                name: {{ .secretRef.name }}
+                name: {{ .secretRef.name | quote }}
             {{- end }}
           {{- end }}
           {{- end }}
           {{- if .volumeMounts }}
           volumeMounts:
           {{- range .volumeMounts }}
-            - name: {{ .name }}
-              mountPath: {{ .mountPath }}
+            - name: {{ .name | quote }}
+              mountPath: {{ .mountPath | quote }}
               {{- if .subPath }}
-              subPath: {{ .subPath }}
+              subPath: {{ .subPath | quote }}
               {{- end }}
               {{- if hasKey . "readOnly" }}
               readOnly: {{ .readOnly }}
@@ -100,14 +100,14 @@ spec:
         {{- if and $.Values.database .secret (eq .secret.secretName "shared-db-app") }}
           {{- fail "shared-db-app may only supply port, username, and password to database workloads" }}
         {{- end }}
-        - name: {{ .name }}
+        - name: {{ .name | quote }}
           {{- if .configMap }}
           configMap:
-            name: {{ $.Values.metadata.name }}-{{ .configMap.name }}
+            name: {{ printf "%s-%s" $.Values.metadata.name .configMap.name | quote }}
           {{- end }}
           {{- if .secret }}
           secret:
-            secretName: {{ .secret.secretName }}
+            secretName: {{ .secret.secretName | quote }}
           {{- end }}
       {{- end }}
       {{- end }}
