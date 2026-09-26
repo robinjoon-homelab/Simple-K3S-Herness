@@ -12,6 +12,7 @@
 # Python
 __pycache__/
 *.py[cod]
+.venv/
 
 # Local secrets
 local.env
