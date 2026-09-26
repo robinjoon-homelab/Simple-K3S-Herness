@@ -1,0 +1,104 @@
+name: Build deploy API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - server/**
+      - .github/workflows/build-deploy-api.yml
+  pull_request:
+    paths:
+      - server/**
+      - .github/workflows/build-deploy-api.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-deploy-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the harness
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - name: Install server dependencies
+        run: python3 -m pip install -r server/requirements.txt
+      - name: Run harness tests
+        run: python3 -m unittest discover -s tests
+      - name: Run server tests
+        working-directory: server
+        run: python3 -m unittest discover -s tests
+
+  publish:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      actions: write
+    env:
+      REGISTRY_HOST: registry.homelab.robinjoon.xyz
+      IMAGE_NAME: apps/deploy-api
+      IMAGE_TAG: sha-${{ github.sha }}-run-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out the harness
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Load registry credentials from SMS
+        uses: ./.github/actions/load-ci-secrets
+        with:
+          app: zot
+      - name: Validate publish configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in REGISTRY_USERNAME REGISTRY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::${name} is not configured"
+              exit 1
+            fi
+          done
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Log in to the home registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY_HOST }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+      - name: Build and push immutable image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: server
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.REGISTRY_HOST }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+      - name: Request workload release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f workloads/deploy-api/values.json ]]; then
+            echo "deploy-api is not registered yet. Pushed ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}"
+            exit 0
+          fi
+          gh workflow run release-workload-image.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f app=deploy-api \
+            -f container=app \
+            -f tag="$IMAGE_TAG"

@@ -255,6 +255,8 @@ zot 이미지 데이터는 `local-path` StorageClass의 `zot-pvc-zot-0` PVC에 �
 source ./local.env
 
 python3 -m unittest discover -s tests
+python3 -m venv .venv && .venv/bin/pip install -r server/requirements.txt
+(cd server && ../.venv/bin/python -m unittest discover -s tests)
 kubectl -n registry-system rollout status statefulset/zot --timeout=5m
 kubectl -n registry-system exec statefulset/zot -- \
   zot verify /etc/zot/config.json
