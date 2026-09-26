@@ -5,11 +5,13 @@
 ## 전체 시스템
 
 - `robinjoon-homelab`은 단일 운영자의 개인용 앱과 공통 홈랩 인프라를 관리하는 GitHub Organization이다. 노션 블로그는 여러 동등한 앱 중 하나이며 구조의 중심이 아니다. 직접 개발한 앱과 직접 구축한 오픈소스 서비스를 함께 운영한다.
-- 이 저장소 `Simple-K3S-Herness`는 **배포 하네스**다. 앱 소스와 비밀 값의 저장소가 아니다. 워크로드 계약, 공통 Helm Chart, 공통 인프라 선언, 구성 CLI, CI 릴리스 workflow와 공통 Secret 조회 Action을 소유한다.
+- 이 저장소 `Simple-K3S-Herness`는 **배포 하네스**다. 일반 앱 소스와 비밀 값의 저장소가 아니다. 워크로드 계약, 공통 Helm Chart, 공통 인프라 선언, 구성 CLI, CI 릴리스·워크로드 적용 workflow, 공통 Secret 조회 Action, 하네스 자체 서비스인 배포 요청 API(`server/`)의 소스와 이미지 빌드를 소유한다.
 - SMS 구현 코드는 별도 비공개 저장소 [`robinjoon-homelab/Secret-Manager-System`](https://github.com/robinjoon-homelab/Secret-Manager-System)에 있다. 일반 앱의 소스·빌드 CI도 해당 앱 저장소가 소유한다. SMS의 클래스·DB 스키마·관리 UI 내부 구현을 이 하네스에 복제하지 않는다.
 - **제1원칙은 앱 간 격리 최소화**다. namespace와 논리 DB는 운영상의 구분이며, 공유 PostgreSQL 계정과 레지스트리 계정을 사용한다. 외부 접근 인증과 비밀의 Git·로그 노출 방지는 유지한다.
 
 주 배포 흐름은 `앱 소스 → 앱 CI → zot 이미지 발행 → 하네스 릴리스 요청 → 하네스 Git → Argo CD → k3s 앱 실행`이다. 운영자·에이전트는 구성 CLI로 배포 계약을 변경한다. 앱 CI는 릴리스 workflow로 기존 이미지 태그만 바꾼다. Argo CD가 읽는 것은 원격 Git이며 로컬 파일 수정이나 커밋만으로는 배포되지 않는다.
+
+앱 레포에서 일하는 에이전트는 배포 요청 API(`https://deploy.homelab.robinjoon.xyz`)로 워크로드를 조회·생성·수정한다. API는 GitHub API로 조회하고 호출자 GitHub 토큰으로 `apply-workload.yml`을 실행하며, 그 workflow가 CLI로 파일을 수정해 커밋한다. 서버는 파일 수정·클러스터 접근·비밀 값 보관을 하지 않는다.
 
 k3s의 공통 서비스는 Argo CD(GitOps 동기화), zot(이미지), 공유 PostgreSQL/CNPG(DB), Kubernetes Secrets(실행 설정), cert-manager(TLS)이며 Traefik은 기본 앱 접속을 담당한다. SMS도 하네스로 배포하는 서비스다. 다이어그램에서는 이 서비스들을 내부 컨트롤러까지 나누지 않는다. Tailscale 서브넷 라우터는 홈 LAN 접근용 별도 인프라 앱으로 배포하며 장애 복구용이 아니다. Tailscale 계정·tailnet 정책·DNS는 외부 계층에서 관리한다. VPN의 초기 인증 등록과 접속 검증 상태는 `docs/VPN.md`를 확인한다.
 
@@ -36,6 +38,7 @@ CI와 앱 실행용 비밀은 다음처럼 구분한다.
 | 홈 네트워크 VPN 설치·인증·접속 확인 | [VPN 운영 절차](docs/VPN.md) |
 | SMS와의 연결·허용 정책 확인 | [SMS 외부 계약](docs/SECRET_MANAGE_SYSTEM.md); 내부 변경은 SMS 구현 저장소에서 수행 |
 | 공통 Action 수정·소비 앱 CI 연결 | [공통 Action](docs/GITHUB_ACTION.md) |
+| 배포 요청 API·앱 에이전트 연동 | [배포 요청 API](docs/DEPLOY_API.md) |
 
 ## 작업 경계와 확인
 

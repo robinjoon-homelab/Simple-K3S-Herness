@@ -99,13 +99,17 @@ VPN 인프라가 사용하는 `tailscale` namespace는 일반 앱 이름으로 �
 
 검증은 JSON Schema와 Helm lint/렌더링에 초점을 둔다. 이것은 클러스터 API 검증, Secret 존재 확인, 네트워크 연결 확인 또는 무중단 배포 보장이 아니다.
 
+### 배포 요청 API와 워크로드 적용 workflow
+
+앱 레포의 에이전트는 [배포 요청 API](DEPLOY_API.md)를 사용한다. 서버는 조회를 GitHub API로 처리하고, 생성·수정은 호출자 GitHub 토큰으로 `.github/workflows/apply-workload.yml`을 실행한다. 이 workflow는 입력을 `platform.py create`·`patch --if-match` 인자로 넘기고, 변경 파일 범위를 확인한 뒤 릴리스 workflow와 같은 동시성 그룹에서 커밋·push한다. 계약 판단은 CLI만 한다.
+
 ### CI 릴리스 CLI
 
 `tools/release.py NAME --container NAME --tag TAG`는 앱 CI의 이미지 push 이후 실행되는 별도 인터페이스다. 기존 워크로드와 컨테이너가 정확히 하나 존재할 때 이미지 repository와 나머지 워크로드 설정은 그대로 두고 태그만 바꾼다. OCI 태그 문법에 맞지 않는 값과 `latest`를 거부하며, 변경된 전체 values가 Helm lint를 통과하기 전에는 파일을 쓰지 않는다.
 
 `.github/workflows/release-workload-image.yml`은 수동 또는 외부 앱 CI의 `workflow_dispatch` 입력을 받아 Python과 Helm을 준비하고, 릴리스 CLI 실행, 변경 파일 범위 확인, 커밋과 push를 수행한다. Git 인증과 경합 처리는 Actions 워크플로의 책임이며 `release.py`는 Git, 레지스트리, Argo CD, Kubernetes를 직접 조작하지 않는다. 모든 릴리스 요청은 하나의 동시성 그룹에서 직렬화한다.
 
-AI 에이전트는 구성 변경에 `release.py`를 사용하지 않고, 앱 CI는 `platform.py patch`로 이미지 태그를 갱신하지 않는다. 이 두 인터페이스 밖에서 `workloads/*/values.json`을 직접 수정하지 않는다.
+AI 에이전트는 구성 변경에 `release.py`를 사용하지 않고, 앱 CI는 `platform.py patch`로 이미지 태그를 갱신하지 않는다. 이 인터페이스들 밖에서 `workloads/*/values.json`을 직접 수정하지 않는다.
 
 ## 6. Argo CD 정책
 

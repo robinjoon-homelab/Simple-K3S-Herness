@@ -1968,9 +1968,9 @@ git commit -m "feat(server): add deploy API image and build workflow"
 
 - [ ] **Step 6: 관계도 갱신** — `docs/diagrams/homelab-application-platform.drawio`(mxGraph XML)를 수정한다.
   - 기존 하네스 영역 근처, 위쪽 운영자 작업 줄에 상자 세 개를 추가한다: `앱 개발 에이전트`(사람 대리), `배포 요청 API`(k3s 서비스), `워크로드 적용 job`(GitHub Actions). 기존 상자 스타일을 복사해 쓴다.
-  - 연결선 네 개를 추가한다: 에이전트 → 배포 요청 API "GitHub 토큰으로 조회·생성·수정 요청", 배포 요청 API → 하네스 Git 저장소 "GitHub API로 조회", 배포 요청 API → 워크로드 적용 job "호출자 토큰으로 workflow 실행", 워크로드 적용 job → 하네스 Git 저장소 "CLI로 수정 후 커밋". 운영자 직접 작업과 같은 회색 점선이 아니라 인증 요청은 보라색, 쓰기는 파란 선 규칙을 따른다.
-  - PNG를 다시 내보낸다: `docker run --rm -v "$PWD/docs/diagrams:/data" rlespinasse/drawio-export:latest --format png --output . homelab-application-platform.drawio` 후 생성 파일로 `homelab-application-platform.png`를 교체한다. 내보내기 도구를 쓸 수 없으면 PNG 갱신이 남았다고 보고한다.
-  - `docs/diagrams/README.md`의 요소·연결선 개수 문장(20개 요소·28개 연결선 → 23개·32개)과 PNG 크기를 실제 값으로 고치고, 배포 요청 API 설명 문단을 추가한다: "앱 개발 에이전트는 배포 요청 API로 워크로드를 조회·생성·수정한다. API는 GitHub API로 하네스 Git을 읽고, 호출자 토큰으로 워크로드 적용 job을 실행한다. job 안의 CLI만 파일을 수정한다."
+  - 연결선 세 개를 추가한다: 에이전트 → 배포 요청 API "GitHub 토큰으로 조회·생성·수정 요청"(보라), 배포 요청 API → 워크로드 적용 job "호출자 토큰으로 workflow 실행"(보라), 워크로드 적용 job → 하네스 Git 저장소 "수정 후 커밋"(파랑). API의 GitHub 조회는 라벨이 기존 릴리스 라벨과 겹치므로 연결선 대신 상자 설명 "GitHub API로 조회·workflow 실행"에 적는다.
+  - PNG를 다시 만든다. Docker·draw.io 데스크톱 없이도 되도록, draw.io 뷰어(`https://viewer.diagrams.net/js/viewer-static.min.js`)를 불러오는 임시 HTML에 원본 XML을 넣고 헤드리스 Chrome으로 3540×2350 스크린샷을 찍는다. 렌더링용 사본에만 투명 기준 셀(x=0, y=26)을 넣어 기존 PNG와 여백을 맞추고, 기존 PNG와 내용 경계가 같은지 비교한다. 다이어그램 내용은 외부로 보내지 않는다.
+  - `docs/diagrams/README.md`의 요소·연결선 개수 문장(20개 요소·28개 연결선 → 23개·31개)을 고치고, 배포 요청 API 설명 문단을 추가한다.
   - PNG를 열어 새 상자와 라벨이 겹치지 않는지 눈으로 확인한다.
 
 - [ ] **Step 7: 확인** — Run: `python3 -m unittest discover -s tests` (문서 변경이 테스트에 영향 없는지), `grep -rn "platform.py \(doctor\|schema\|list\|validate\|render\)" --include=*.md . | grep -v docs/superpowers` / Expected: 테스트 OK, grep 결과 없음. 새 링크 대상 파일이 모두 존재하는지 확인한다.

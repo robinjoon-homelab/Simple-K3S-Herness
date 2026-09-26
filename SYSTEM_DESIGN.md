@@ -43,6 +43,7 @@ C4의 수준은 문서의 관심사를 정하는 기준으로 사용한다. HTTP
 ```mermaid
 flowchart LR
     operator["운영자<br/>Person"]
+    agent["앱 개발 에이전트<br/>Person 대리"]
     github["GitHub<br/>소스 관리 · Actions · 실행 신원 발급"]
     harness["배포 하네스<br/>설정 변경 · 릴리스 요청 · GitOps 동기화"]
     sms["Secret Manage System<br/>CI 자격증명 보관·관리·조회"]
@@ -51,6 +52,7 @@ flowchart LR
     apps["각 앱<br/>노션 블로그 등 실행 중인 서비스"]
 
     operator -->|"배포 설정 변경"| harness
+    agent -->|"배포 요청 API로 워크로드 조회·생성·수정"| harness
     operator -->|"직접 웹 UI에 접속해 CI 자격증명 관리"| sms
     harness -->|"선언된 SMS 구성 동기화"| sms
     github -->|"실행 신원을 제시하고 CI 값 요청"| sms
@@ -72,6 +74,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     operator["운영자<br/>Person"]
+    agent["앱 개발 에이전트<br/>Person 대리"]
     oidc["GitHub OIDC<br/>외부 시스템: 실행 신원 발급"]
 
     subgraph appDelivery["각 앱의 빌드·배포"]
@@ -83,6 +86,8 @@ flowchart TB
         harnessGit[("하네스 Git 저장소<br/>배포 계약 · 공통 Chart · Action 코드")]
         configCLI["워크로드 구성 CLI<br/>Python / 로컬 실행"]
         release["하네스 릴리스 job<br/>GitHub Actions / Python CLI"]
+        deployApi["배포 요청 API<br/>FastAPI / k3s"]
+        applyJob["워크로드 적용 job<br/>GitHub Actions / Python CLI"]
         argo["Argo CD<br/>Git 배포 계약 동기화"]
     end
 
@@ -102,6 +107,10 @@ flowchart TB
 
     operator -->|"직접 또는 AI 에이전트로 구성 변경"| configCLI
     configCLI -->|"배포 계약 작성 후 운영자가 Git 반영"| harnessGit
+    agent -->|"GitHub 토큰으로 HTTPS 요청"| deployApi
+    deployApi -->|"호출자 토큰으로 GitHub API 조회"| harnessGit
+    deployApi -->|"호출자 토큰으로 workflow_dispatch"| applyJob
+    applyJob -->|"CLI로 생성·수정 후 Git 반영"| harnessGit
     operator -->|"운영자 인증 후 웹 UI에서 CI 값 관리"| sms
     appRepo -->|"소스와 워크플로 제공"| appCI
     harnessGit -->|"고정된 버전의 공통 Action 제공"| appCI
@@ -130,7 +139,8 @@ flowchart TB
 | GitHub OIDC | 실행 출처를 증명한다. Secret 저장소도 아니며 홈서버로의 네트워크 연결을 제공하지도 않는다. |
 | Secret Manage System | 운영자가 직접 사용하는 템플릿 기반 UI·관리 API와 CI 조회 API를 제공한다. 운영자 인증과 CI OIDC 조회 권한을 구분하며, 앱 레포별로 조회 권한을 나누지 않는다. |
 | 공유 PostgreSQL · 기존 | `secret_manage_system`과 앱별 논리 DB를 같은 Cluster에 두고, 인스턴스와 `defaultuser` 계정을 공유한다. |
-| 워크로드 구성 CLI | 운영자나 AI 에이전트가 기존 앱 계약을 생성·수정한다. CLI의 파일 변경과 운영자의 Git 반영은 별도 단계다. |
+| 워크로드 구성 CLI | 운영자, 하네스 안의 AI 에이전트, 워크로드 적용 job이 앱 계약을 생성·수정한다. 로컬 실행에서는 CLI의 파일 변경과 운영자의 Git 반영이 별도 단계다. |
+| 배포 요청 API·워크로드 적용 job | 앱 에이전트의 조회·생성·수정 요청을 받아 GitHub API로 조회하고 호출자 토큰으로 적용 workflow를 실행한다. 파일 수정은 workflow 안의 CLI만 한다. 서버는 비밀 값과 클러스터 권한이 없다. |
 | 하네스 Git·릴리스 job·Argo CD | 기존 이미지 태그 변경과 GitOps 배포를 계속 담당한다. 시크릿 관리 앱이 이 경로를 대체하지 않는다. |
 | zot | 같은 공통 계정으로 이미지 발행과 pull을 지원한다. 계정 자체의 권한은 기존과 같다. |
 | 앱 실행 프로세스·기존 Secrets | 기존 앱의 런타임 설정을 유지하고, `shared-db-app` 접속 정보는 기존 계약으로 SMS에도 주입한다. CI에서 받은 값은 앱 Pod에 자동 주입하지 않는다. |
