@@ -355,6 +355,7 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
+          : > "$RUNNER_TEMP/cli-error.txt"
           file_args=()
           if [[ -n "$VALUES_JSON" ]]; then
             printf '%s' "$VALUES_JSON" > "$RUNNER_TEMP/values.json"
@@ -365,11 +366,12 @@ jobs:
               extra_args=()
               if [[ -n "$KIND" ]]; then extra_args+=(--kind "$KIND"); fi
               if [[ -n "$DB_NAME" ]]; then extra_args+=(--db-name "$DB_NAME"); fi
-              python3 tools/platform.py create "$APP_NAME" --image "$IMAGE" "${extra_args[@]}" "${file_args[@]}" \
+              python3 tools/platform.py create "$APP_NAME" --image "$IMAGE" \
+                ${extra_args[@]+"${extra_args[@]}"} ${file_args[@]+"${file_args[@]}"} \
                 2> "$RUNNER_TEMP/cli-error.txt"
               ;;
             patch)
-              python3 tools/platform.py patch "$APP_NAME" "${file_args[@]}" --if-match "$IF_MATCH" \
+              python3 tools/platform.py patch "$APP_NAME" ${file_args[@]+"${file_args[@]}"} --if-match "$IF_MATCH" \
                 2> "$RUNNER_TEMP/cli-error.txt"
               ;;
             *)

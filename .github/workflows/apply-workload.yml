@@ -1,0 +1,186 @@
+name: Apply workload
+run-name: ${{ inputs.operation }} ${{ inputs.app }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: create or patch
+        required: true
+        type: choice
+        options: [create, patch]
+      app:
+        description: Workload name
+        required: true
+        type: string
+      image:
+        description: Image reference for create
+        required: false
+        type: string
+      kind:
+        description: Workload kind for create
+        required: false
+        type: string
+      db_name:
+        description: Shared database name for create
+        required: false
+        type: string
+      values:
+        description: JSON passed to the CLI --file option
+        required: false
+        type: string
+      if_match:
+        description: Git blob SHA of values.json for patch
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-workload-image
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      OPERATION: ${{ inputs.operation }}
+      APP_NAME: ${{ inputs.app }}
+      IMAGE: ${{ inputs.image }}
+      KIND: ${{ inputs.kind }}
+      DB_NAME: ${{ inputs.db_name }}
+      VALUES_JSON: ${{ inputs.values }}
+      IF_MATCH: ${{ inputs.if_match }}
+    steps:
+      - name: Check out the harness
+        id: checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.0.5
+
+      - name: Fast-forward to the latest main
+        run: git pull --ff-only origin main
+
+      - name: Apply the workload change
+        id: apply
+        shell: bash
+        run: |
+          set -uo pipefail
+          : > "$RUNNER_TEMP/cli-error.txt"
+          file_args=()
+          if [[ -n "$VALUES_JSON" ]]; then
+            printf '%s' "$VALUES_JSON" > "$RUNNER_TEMP/values.json"
+            file_args=(--file "$RUNNER_TEMP/values.json")
+          fi
+          case "$OPERATION" in
+            create)
+              extra_args=()
+              if [[ -n "$KIND" ]]; then extra_args+=(--kind "$KIND"); fi
+              if [[ -n "$DB_NAME" ]]; then extra_args+=(--db-name "$DB_NAME"); fi
+              python3 tools/platform.py create "$APP_NAME" --image "$IMAGE" \
+                ${extra_args[@]+"${extra_args[@]}"} ${file_args[@]+"${file_args[@]}"} \
+                2> "$RUNNER_TEMP/cli-error.txt"
+              ;;
+            patch)
+              python3 tools/platform.py patch "$APP_NAME" ${file_args[@]+"${file_args[@]}"} --if-match "$IF_MATCH" \
+                2> "$RUNNER_TEMP/cli-error.txt"
+              ;;
+            *)
+              echo "Unsupported operation: $OPERATION" > "$RUNNER_TEMP/cli-error.txt"
+              false
+              ;;
+          esac
+          status=$?
+          cat "$RUNNER_TEMP/cli-error.txt" >&2
+          exit "$status"
+
+      - name: Verify the change scope
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          allowed=("workloads/${APP_NAME}/values.json")
+          if [[ "$OPERATION" == create ]]; then
+            allowed+=("argocd/managed/apps/${APP_NAME}.yaml")
+          fi
+          changed="$(git status --porcelain --untracked-files=all | cut -c4-)"
+          if [[ -z "$changed" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          while IFS= read -r path; do
+            ok=false
+            for candidate in "${allowed[@]}"; do
+              if [[ "$path" == "$candidate" ]]; then ok=true; fi
+            done
+            if [[ "$ok" != true ]]; then
+              echo "Unexpected changed file: $path" >&2
+              exit 1
+            fi
+          done <<< "$changed"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        id: push
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- workloads argocd/managed/apps
+          git commit -m "chore(${APP_NAME}): ${OPERATION} workload"
+          if ! git push origin HEAD:main; then
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Write the result
+        if: always()
+        shell: bash
+        env:
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+          SCOPE_OUTCOME: ${{ steps.changes.outcome }}
+          PUSH_OUTCOME: ${{ steps.push.outcome }}
+          CHANGED: ${{ steps.changes.outputs.changed }}
+          COMMIT: ${{ steps.push.outputs.commit }}
+        run: |
+          set -euo pipefail
+          error_file="$RUNNER_TEMP/cli-error.txt"
+          if [[ "$APPLY_OUTCOME" == failure ]]; then
+            jq -n --rawfile message "$error_file" '{status: "failed", message: ($message | .[0:60000])}' > result.json
+          elif [[ "$APPLY_OUTCOME" != success ]]; then
+            jq -n '{status: "failed", message: "The workflow failed before applying the change."}' > result.json
+          elif [[ "$SCOPE_OUTCOME" != success ]]; then
+            jq -n '{status: "failed", message: "The CLI changed files outside the allowed scope."}' > result.json
+          elif [[ "$CHANGED" != true ]]; then
+            jq -n '{status: "unchanged"}' > result.json
+          elif [[ "$PUSH_OUTCOME" == success ]]; then
+            jq -n --arg commit "$COMMIT" '{status: "committed", commit: $commit}' > result.json
+          else
+            jq -n '{status: "failed", message: "Committing or pushing the change failed."}' > result.json
+          fi
+          cat result.json
+
+      - name: Upload the result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: workload-result
+          path: result.json
+          retention-days: 7
