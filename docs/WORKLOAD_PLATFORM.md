@@ -19,7 +19,7 @@
 
 ```text
 AI 에이전트
-  │ tools/platform.py (doctor/schema/list/create/get/patch/validate/render)
+  │ tools/platform.py (create/get/patch)
   ▼
 workloads/<app>/values.json + argocd/managed/apps/<app>.yaml
   │ Git push
@@ -30,7 +30,7 @@ Argo CD Root Application → Child Application → 공통 Helm Chart → K3s
   │ workflow_dispatch (app/container/tag)
   ▼
 GitHub Actions → tools/release.py (기존 이미지 태그만 변경)
-  │ validate/render → Git commit/push
+  │ Git commit/push
   ▼
 Argo CD Child Application → 공통 Helm Chart → K3s
 ```
@@ -86,15 +86,12 @@ zot에 내장된 htpasswd 인증과 저장소 ACL을 사용하고 익명 접근�
 에이전트가 사용할 명령은 flat 형태로 고정한다.
 
 ```text
-doctor
-schema
-list
-create NAME --image IMAGE [--db-name NAME] [--file JSON]
+create NAME --image IMAGE [--kind KIND] [--db-name NAME] [--file JSON]
 get NAME
-patch NAME --file JSON
-validate NAME | validate --all
-render NAME
+patch NAME --file JSON [--if-match SHA]
 ```
+
+`create`·`patch`는 스키마·Helm lint를 통과한 뒤에만 파일을 쓴다. 별도 검증·렌더링 명령은 없다. `--if-match`는 `values.json`의 Git blob SHA를 받아, values를 읽은 뒤의 변경을 덮어쓰지 않게 한다.
 
 일반 앱 배포 구성 작업에서는 에이전트가 CLI를 우회해 values 파일, Argo Application, Helm Chart를 직접 수정하지 않는다. 하네스 자체 기능을 개발하는 작업은 이 제한과 구분하며, 요청된 범위의 CLI·Chart·계약을 함께 수정하고 검증한다. `delete`는 제공하지 않으므로 삭제가 필요하면 운영자가 별도 절차를 수행한다.
 
@@ -106,7 +103,7 @@ VPN 인프라가 사용하는 `tailscale` namespace는 일반 앱 이름으로 �
 
 `tools/release.py NAME --container NAME --tag TAG`는 앱 CI의 이미지 push 이후 실행되는 별도 인터페이스다. 기존 워크로드와 컨테이너가 정확히 하나 존재할 때 이미지 repository와 나머지 워크로드 설정은 그대로 두고 태그만 바꾼다. OCI 태그 문법에 맞지 않는 값과 `latest`를 거부하며, 변경된 전체 values가 Helm lint를 통과하기 전에는 파일을 쓰지 않는다.
 
-`.github/workflows/release-workload-image.yml`은 수동 또는 외부 앱 CI의 `workflow_dispatch` 입력을 받아 Python과 Helm을 준비하고, 릴리스 CLI 실행, validate/render, 변경 파일 범위 확인, 커밋과 push를 수행한다. Git 인증과 경합 처리는 Actions 워크플로의 책임이며 `release.py`는 Git, 레지스트리, Argo CD, Kubernetes를 직접 조작하지 않는다. 모든 릴리스 요청은 하나의 동시성 그룹에서 직렬화한다.
+`.github/workflows/release-workload-image.yml`은 수동 또는 외부 앱 CI의 `workflow_dispatch` 입력을 받아 Python과 Helm을 준비하고, 릴리스 CLI 실행, 변경 파일 범위 확인, 커밋과 push를 수행한다. Git 인증과 경합 처리는 Actions 워크플로의 책임이며 `release.py`는 Git, 레지스트리, Argo CD, Kubernetes를 직접 조작하지 않는다. 모든 릴리스 요청은 하나의 동시성 그룹에서 직렬화한다.
 
 AI 에이전트는 구성 변경에 `release.py`를 사용하지 않고, 앱 CI는 `platform.py patch`로 이미지 태그를 갱신하지 않는다. 이 두 인터페이스 밖에서 `workloads/*/values.json`을 직접 수정하지 않는다.
 

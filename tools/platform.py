@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -12,7 +13,6 @@ WORKLOADS_DIR = BASE_DIR / "workloads"
 ARGOCD_APPS_DIR = BASE_DIR / "argocd" / "managed" / "apps"
 CHART_DIR = BASE_DIR / "chart"
 DEFAULTS_FILE = BASE_DIR / "platform" / "defaults.json"
-SCHEMA_FILE = CHART_DIR / "values.schema.json"
 
 DNS_1123_LABEL = re.compile(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
 WORKLOAD_NAMESPACE_LABEL = "simple-k3s-harness.dev/workload"
@@ -95,10 +95,6 @@ def lint_values(values):
             tmp_path.unlink(missing_ok=True)
 
 
-def lint_file(values_file):
-    return run_cmd(["helm", "lint", str(CHART_DIR), *helm_value_files(values_file)])
-
-
 def print_command_failure(prefix, result):
     print(prefix, file=sys.stderr)
     if result.stdout:
@@ -113,6 +109,11 @@ def values_file_for(app_name):
     if not values_file.is_file():
         fail(f"Workload {app_name} not found.")
     return values_file
+
+
+def git_blob_sha(path):
+    data = Path(path).read_bytes()
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
 def application_yaml(app_name):
@@ -188,6 +189,14 @@ def app_create(args):
 def app_patch(args):
     app_name = args.name
     values_file = values_file_for(app_name)
+    expected = getattr(args, "if_match", None)
+    if expected is not None:
+        current = git_blob_sha(values_file)
+        if current != expected:
+            fail(
+                f"Workload {app_name} changed since version {expected}; "
+                f"current version is {current}. Read it again and retry."
+            )
     current_values = load_json(values_file)
     dict_merge(current_values, load_json(args.file))
     ensure_workload_values(current_values, app_name)
@@ -201,84 +210,13 @@ def app_patch(args):
     print(f"Patched {app_name} successfully.")
 
 
-def app_validate(args):
-    if args.all:
-        app_names = app_names_in_workloads()
-        if not app_names:
-            print("No workloads found.")
-            return
-    else:
-        if not args.name:
-            fail("Provide a workload name or use --all.")
-        app_names = [args.name]
-
-    failures = []
-    for app_name in app_names:
-        values_file = values_file_for(app_name)
-        ensure_workload_values(load_json(values_file), app_name)
-        result = lint_file(values_file)
-        if result.returncode != 0:
-            failures.append(app_name)
-            print_command_failure(f"Validation failed for {app_name}.", result)
-        else:
-            print(f"Validation successful for {app_name}.")
-    if failures:
-        raise SystemExit(1)
-
-
 def app_get(args):
     print(values_file_for(args.name).read_text(), end="")
-
-
-def app_list(_args):
-    for app_name in app_names_in_workloads():
-        print(app_name)
-
-
-def app_names_in_workloads():
-    if not WORKLOADS_DIR.is_dir():
-        return []
-    return sorted(path.name for path in WORKLOADS_DIR.iterdir() if (path / "values.json").is_file())
-
-
-def app_render(args):
-    app_name = args.name
-    values_file = values_file_for(app_name)
-    ensure_workload_values(load_json(values_file), app_name)
-    result = run_cmd(["helm", "template", app_name, str(CHART_DIR), *helm_value_files(values_file)])
-    if result.returncode != 0:
-        print_command_failure(f"Render failed for {app_name}.", result)
-        raise SystemExit(1)
-    print(result.stdout, end="")
-
-
-def doctor(_args):
-    missing = [str(path) for path in (CHART_DIR, DEFAULTS_FILE, SCHEMA_FILE) if not path.exists()]
-    if missing:
-        fail(f"Required platform files are missing: {', '.join(missing)}")
-    result = run_cmd(["helm", "version", "--short"])
-    if result.returncode != 0:
-        print_command_failure("Helm is not available.", result)
-        raise SystemExit(1)
-    print(f"Platform ready ({result.stdout.strip()}).")
-
-
-def schema(_args):
-    workload_schema = load_json(SCHEMA_FILE)
-    workload_schema["properties"].pop("platform", None)
-    print(json.dumps(workload_schema, indent=2) + "\n", end="")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Manage homelab workloads through the supported JSON contract.")
     subparsers = parser.add_subparsers(dest="cmd", required=True)
-
-    parser_doctor = subparsers.add_parser("doctor", help="Check local platform prerequisites")
-    parser_doctor.set_defaults(func=doctor)
-    parser_schema = subparsers.add_parser("schema", help="Print the workload JSON schema")
-    parser_schema.set_defaults(func=schema)
-    parser_list = subparsers.add_parser("list", help="List workloads")
-    parser_list.set_defaults(func=app_list)
 
     parser_create = subparsers.add_parser("create", help="Create a workload")
     parser_create.add_argument("name")
@@ -294,18 +232,10 @@ def main():
     parser_patch = subparsers.add_parser("patch", help="Merge a JSON patch into workload values")
     parser_patch.add_argument("name")
     parser_patch.add_argument("--file", required=True)
+    parser_patch.add_argument("--if-match", help="Apply only if values.json still has this Git blob SHA")
     parser_patch.set_defaults(func=app_patch)
-    parser_validate = subparsers.add_parser("validate", help="Validate one workload or all workloads")
-    parser_validate.add_argument("name", nargs="?")
-    parser_validate.add_argument("--all", action="store_true")
-    parser_validate.set_defaults(func=app_validate)
-    parser_render = subparsers.add_parser("render", help="Render a workload manifest")
-    parser_render.add_argument("name")
-    parser_render.set_defaults(func=app_render)
 
     args = parser.parse_args()
-    if args.cmd == "validate" and args.all and args.name:
-        parser.error("validate accepts either a workload name or --all, not both")
     args.func(args)
 
 

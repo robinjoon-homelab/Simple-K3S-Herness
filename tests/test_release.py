@@ -139,8 +139,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
 
     def test_only_updates_gitops_state_through_the_release_contract(self):
         self.assertIn('python3 tools/release.py "$APP_NAME"', self.workflow)
-        self.assertIn('python3 tools/platform.py validate "$APP_NAME"', self.workflow)
-        self.assertIn('python3 tools/platform.py render "$APP_NAME"', self.workflow)
+        self.assertNotIn("tools/platform.py", self.workflow)
         self.assertNotIn("kubectl", self.workflow)
         self.assertNotIn("argocd", self.workflow)
         self.assertNotIn("docker", self.workflow)

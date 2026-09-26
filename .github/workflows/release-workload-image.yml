@@ -58,11 +58,6 @@ jobs:
             --container "$CONTAINER_NAME" \
             --tag "$IMAGE_TAG"
 
-      - name: Validate and render the workload
-        run: |
-          python3 tools/platform.py validate "$APP_NAME"
-          python3 tools/platform.py render "$APP_NAME" >/dev/null
-
       - name: Verify the change scope
         id: changes
         shell: bash

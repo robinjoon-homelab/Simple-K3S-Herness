@@ -1,6 +1,9 @@
 import argparse
+import contextlib
+import io
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -93,31 +96,59 @@ class PlatformTest(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     platform.app_patch(argparse.Namespace(name="my-api", file=patch_file))
 
-    def test_render_uses_defaults_before_workload_values(self):
+    def write_workload(self, root):
+        values_file = root / "workloads" / "my-api" / "values.json"
+        values_file.parent.mkdir(parents=True)
+        values_file.write_text(json.dumps({"metadata": {"name": "my-api", "namespace": "my-api"}}, indent=2) + "\n")
+        patch_file = root / "patch.json"
+        patch_file.write_text(json.dumps({"database": {"name": "my_api"}}))
+        return values_file, patch_file
+
+    def test_git_blob_sha_matches_git_hash_object(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            values_file, _ = self.write_workload(Path(tmp_dir))
+            expected = subprocess.run(
+                ["git", "hash-object", str(values_file)], text=True, capture_output=True, check=True,
+            ).stdout.strip()
+            self.assertEqual(platform.git_blob_sha(values_file), expected)
+
+    def test_patch_applies_when_if_match_is_current(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            values_file = root / "workloads" / "my-api" / "values.json"
-            values_file.parent.mkdir(parents=True)
-            values_file.write_text(json.dumps({
-                "metadata": {"name": "my-api", "namespace": "my-api"},
-            }))
-            defaults = root / "defaults.json"
-            defaults.write_text("{}")
-            chart = root / "chart"
-            chart.mkdir()
-            calls = []
+            values_file, patch_file = self.write_workload(root)
+            args = argparse.Namespace(name="my-api", file=patch_file, if_match=platform.git_blob_sha(values_file))
+            lint_ok = subprocess.CompletedProcess([], 0, "", "")
+            with patch.object(platform, "WORKLOADS_DIR", root / "workloads"), \
+                    patch.object(platform, "lint_values", return_value=lint_ok), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                platform.app_patch(args)
+            self.assertEqual(json.loads(values_file.read_text())["database"], {"name": "my_api"})
 
-            def fake_run(cmd, cwd=None):
-                calls.append(cmd)
-                return subprocess.CompletedProcess(cmd, 0, "kind: Deployment\n", "")
+    def test_patch_rejects_stale_if_match_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            values_file, patch_file = self.write_workload(root)
+            before = values_file.read_bytes()
+            current = platform.git_blob_sha(values_file)
+            args = argparse.Namespace(name="my-api", file=patch_file, if_match="0" * 40)
+            stderr = io.StringIO()
+            with patch.object(platform, "WORKLOADS_DIR", root / "workloads"), \
+                    contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit):
+                platform.app_patch(args)
+            self.assertEqual(values_file.read_bytes(), before)
+            self.assertIn(f"current version is {current}", stderr.getvalue())
 
-            with patch.multiple(platform, WORKLOADS_DIR=root / "workloads", DEFAULTS_FILE=defaults, CHART_DIR=chart), patch.object(platform, "run_cmd", fake_run):
-                platform.app_render(argparse.Namespace(name="my-api"))
-
-            self.assertEqual(
-                calls[0],
-                ["helm", "template", "my-api", str(chart), "-f", str(defaults), "-f", str(values_file)],
-            )
+    def test_cli_parses_if_match_and_rejects_removed_commands(self):
+        calls = []
+        with patch.object(sys, "argv", ["platform.py", "patch", "my-api", "--file", "p.json", "--if-match", "a" * 40]), \
+                patch.object(platform, "app_patch", calls.append):
+            platform.main()
+        self.assertEqual((calls[0].name, calls[0].file, calls[0].if_match), ("my-api", "p.json", "a" * 40))
+        for command in ("doctor", "schema", "list", "validate", "render"):
+            with self.subTest(command=command), patch.object(sys, "argv", ["platform.py", command]), \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as raised:
+                platform.main()
+            self.assertEqual(raised.exception.code, 2)
 
 
 if __name__ == "__main__":

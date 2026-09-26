@@ -166,19 +166,23 @@ def git_blob_sha(path):
 
 ```bash
 python3 tools/platform.py create my-api --image registry.homelab.robinjoon.xyz/apps/my-api:git-0123456789ab --db-name my_api_db
+
+# 수정: 값을 읽는 시점의 버전을 먼저 저장하고, 그 값을 그대로 patch에 넘깁니다.
+EXPECTED_SHA="$(git hash-object workloads/my-api/values.json)"
 python3 tools/platform.py get my-api
-python3 tools/platform.py patch my-api --file /tmp/patch.json --if-match "$(git hash-object workloads/my-api/values.json)"
+# 위 값을 기준으로 /tmp/patch.json 작성
+python3 tools/platform.py patch my-api --file /tmp/patch.json --if-match "$EXPECTED_SHA"
 ```
 
-    > `create`와 `patch`는 JSON Schema와 Helm lint를 통과해야만 파일을 씁니다. 사용할 수 있는 필드는 `chart/values.schema.json`에서 확인하며 `platform` 속성은 플랫폼 전용입니다. `--if-match`는 선택이며, 값을 읽은 뒤 다른 변경(예: CI 릴리스)이 끼어들었으면 파일을 수정하지 않고 실패합니다. 결과는 `git diff`로 확인합니다.
+    > `create`와 `patch`는 JSON Schema와 Helm lint를 통과해야만 파일을 씁니다. 사용할 수 있는 필드는 `chart/values.schema.json`에서 확인하며 `platform` 속성은 플랫폼 전용입니다. `--if-match`는 선택이며, 값을 읽은 뒤 다른 변경(예: CI 릴리스)이 끼어들었으면 파일을 수정하지 않고 실패합니다. 이 보호는 읽을 때 저장한 SHA를 넘길 때만 동작하므로 patch 직전에 SHA를 새로 계산하지 않습니다. 실패하면 values를 다시 읽고 patch를 새로 만듭니다. 결과는 `git diff`로 확인합니다.
 
   - `skills/homelab-k3s-workloads/SKILL.md`: description의 `validates and renders`를 `validates before writing`으로 바꾸고, 작업 순서를 다음으로 교체한다. 미지원 기능 절의 "CLI 또는 `schema`가"를 "CLI 또는 `chart/values.schema.json`이"로 바꾼다.
 
 ```markdown
-1. 기존 앱은 `python3 tools/platform.py get <name>`으로 현재 계약을 확인합니다.
+1. 기존 앱을 수정할 때는 먼저 `EXPECTED_SHA="$(git hash-object workloads/<name>/values.json)"`로 읽는 시점의 버전을 저장하고, `python3 tools/platform.py get <name>`으로 현재 계약을 확인합니다.
 2. 필요한 필드는 `chart/values.schema.json`에서 확인합니다. `platform` 속성은 플랫폼 전용이라 사용하지 않습니다.
 3. 생성은 `create <name> --image <image>`을 사용하고, DB가 필요하면 `--db-name <database-name>`을 추가합니다.
-4. 수정은 `patch <name> --file <json-file> --if-match "$(git hash-object workloads/<name>/values.json)"`를 사용합니다.
+4. 수정은 1단계에서 읽은 값을 기준으로 JSON을 만들고 `patch <name> --file <json-file> --if-match "$EXPECTED_SHA"`를 사용합니다. patch 직전에 SHA를 새로 계산하지 않습니다. "changed since"로 실패하면 1단계부터 다시 합니다.
 5. `create`·`patch`는 스키마와 Helm lint를 통과해야만 파일을 씁니다. 결과는 `git diff`로 확인합니다.
 ```
 

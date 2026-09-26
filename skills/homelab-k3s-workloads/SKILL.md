@@ -1,7 +1,7 @@
 ---
 name: homelab-k3s-workloads
 description: >
-  Creates, inspects, modifies, validates and renders Deployment workloads in
+  Creates, inspects, modifies, validates before writing Deployment workloads in
   this homelab K3s GitOps repository using the flat tools/platform.py CLI.
   Use for supported containers, private registry Secret references, ConfigMaps,
   environment variables, Secret references, volumes, Services, Ingress,
@@ -12,12 +12,11 @@ description: >
 
 ## 작업 순서
 
-1. `python3 tools/platform.py doctor`로 CLI 상태를 확인합니다.
-2. 기존 앱은 `python3 tools/platform.py get <name>`으로 현재 계약을 확인합니다.
-3. 필요한 필드는 `python3 tools/platform.py schema`로 확인합니다.
-4. 생성은 `create <name> --image <image>`을 사용하고, DB가 필요하면 `--db-name <database-name>`을 추가합니다.
-5. 수정은 `patch <name> --file <json-file>`만 사용합니다.
-6. `validate <name>` 또는 `validate --all`로 검증하고 `render <name>`으로 결과를 확인합니다.
+1. 기존 앱을 수정할 때는 먼저 `EXPECTED_SHA="$(git hash-object workloads/<name>/values.json)"`로 읽는 시점의 버전을 저장하고, `python3 tools/platform.py get <name>`으로 현재 계약을 확인합니다.
+2. 필요한 필드는 `chart/values.schema.json`에서 확인합니다. `platform` 속성은 플랫폼 전용이라 사용하지 않습니다.
+3. 생성은 `create <name> --image <image>`을 사용하고, DB가 필요하면 `--db-name <database-name>`을 추가합니다.
+4. 수정은 1단계에서 읽은 값을 기준으로 JSON을 만들고 `patch <name> --file <json-file> --if-match "$EXPECTED_SHA"`를 사용합니다. patch 직전에 SHA를 새로 계산하지 않습니다. "changed since"로 실패하면 1단계부터 다시 합니다.
+5. `create`·`patch`는 스키마와 Helm lint를 통과해야만 파일을 씁니다. 결과는 `git diff`로 확인합니다.
 
 ## 지원 범위
 
@@ -40,7 +39,7 @@ description: >
 
 ## 미지원 기능 처리
 
-CLI 또는 `schema`가 지원하지 않는 기능을 요청받으면 YAML 우회나 직접 클러스터 변경을 하지 말고, 현재 Workload Contract 확장이 필요하다고 보고합니다.
+CLI 또는 `chart/values.schema.json`이 지원하지 않는 기능을 요청받으면 YAML 우회나 직접 클러스터 변경을 하지 말고, 현재 Workload Contract 확장이 필요하다고 보고합니다.
 
 ## JSON 패치 예시
 

@@ -222,8 +222,6 @@ CI 전용 CLI는 Git 작업이나 이미지 push, Argo CD 조작을 하지 않�
 python3 tools/release.py notion-blog \
   --container app \
   --tag sha-0123456789abcdef
-python3 tools/platform.py validate notion-blog
-python3 tools/platform.py render notion-blog >/dev/null
 ```
 
 `release.py`는 이미지 repository를 바꾸지 않으며, OCI 태그 문법에 맞지 않는 값과 재사용 가능한 `latest`를 거부합니다. 지정한 컨테이너가 없거나 같은 이름의 컨테이너가 둘 이상이거나 변경 결과가 Helm 검증을 통과하지 못하면 `values.json`을 쓰지 않습니다. 동일한 태그 요청은 성공으로 처리하지만 새 커밋을 만들지 않습니다. Git 커밋 성공은 배포 요청이 Git에 기록되었다는 의미이며 실제 Argo CD 동기화와 Deployment Ready 상태까지 보장하지는 않습니다.
@@ -280,16 +278,16 @@ kubectl -n my-api get secret registry-credentials \
 AI 에이전트는 아래 flat 명령만 사용합니다. `app create` 같은 중첩 명령이나 `delete` 명령은 제공하지 않습니다.
 
 ```bash
-python3 tools/platform.py doctor
-python3 tools/platform.py schema
-python3 tools/platform.py list
 python3 tools/platform.py create my-api --image registry.homelab.robinjoon.xyz/apps/my-api:git-0123456789ab --db-name my_api_db
+
+# 수정: 값을 읽는 시점의 버전을 먼저 저장하고, 그 값을 그대로 patch에 넘깁니다.
+EXPECTED_SHA="$(git hash-object workloads/my-api/values.json)"
 python3 tools/platform.py get my-api
-python3 tools/platform.py patch my-api --file /tmp/patch.json
-python3 tools/platform.py validate my-api
-python3 tools/platform.py validate --all
-python3 tools/platform.py render my-api
+# 위 값을 기준으로 /tmp/patch.json 작성
+python3 tools/platform.py patch my-api --file /tmp/patch.json --if-match "$EXPECTED_SHA"
 ```
+
+`create`와 `patch`는 JSON Schema와 Helm lint를 통과해야만 파일을 씁니다. 사용할 수 있는 필드는 `chart/values.schema.json`에서 확인하며 `platform` 속성은 플랫폼 전용입니다. `--if-match`는 선택이며, 값을 읽은 뒤 다른 변경(예: CI 릴리스)이 끼어들었으면 파일을 수정하지 않고 실패합니다. 이 보호는 읽을 때 저장한 SHA를 넘길 때만 동작하므로 patch 직전에 SHA를 새로 계산하지 않습니다. 실패하면 values를 다시 읽고 patch를 새로 만듭니다. 결과는 `git diff`로 확인합니다.
 
 `--db-name`을 지정하면 공유 `shared-db` Cluster 안에 해당 논리적 database를 선언하고 모든 컨테이너에 `DB_HOST=shared-db-rw.database-system.svc.cluster.local`을 기존 환경변수보다 먼저 주입합니다. `DB_HOST`는 플랫폼 예약 이름이므로 database 워크로드가 직접 정의하면 검증에 실패합니다. 복제된 `shared-db-app`의 `host`나 연결 URI 대신 이 환경변수를 사용합니다. 그 밖의 환경변수, ConfigMap, Secret 참조, 볼륨 마운트, Service, Ingress, cert-manager TLS는 JSON 계약이 허용하는 범위에서 설정할 수 있습니다. 평문 Secret 값은 Git에 저장하지 않습니다.
 
