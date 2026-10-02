@@ -1,0 +1,69 @@
+{
+  "contractVersion": 1,
+  "metadata": {
+    "name": "deploy-api",
+    "namespace": "deploy-api"
+  },
+  "workload": {
+    "kind": "deployment",
+    "replicas": 1,
+    "containers": [
+      {
+        "name": "app",
+        "image": {
+          "repository": "registry.homelab.robinjoon.xyz/apps/deploy-api",
+          "tag": "sha-be3674976e149bbbd06698073c942e9829b20189-run-37000388392-3"
+        },
+        "ports": [
+          {
+            "name": "http",
+            "containerPort": 8080
+          }
+        ],
+        "env": [
+          {
+            "name": "DEPLOY_API_BASE_URL",
+            "value": "https://deploy.homelab.robinjoon.xyz"
+          }
+        ]
+      }
+    ],
+    "imagePullSecrets": [
+      {
+        "name": "registry-credentials"
+      }
+    ]
+  },
+  "services": [
+    {
+      "name": "web",
+      "ports": [
+        {
+          "name": "http",
+          "port": 80,
+          "targetPort": "http"
+        }
+      ]
+    }
+  ],
+  "ingresses": [
+    {
+      "name": "public",
+      "service": "web",
+      "rules": [
+        {
+          "host": "deploy.homelab.robinjoon.xyz",
+          "paths": [
+            {
+              "path": "/",
+              "servicePort": "http"
+            }
+          ]
+        }
+      ],
+      "tls": {
+        "mode": "cert-manager"
+      }
+    }
+  ]
+}
