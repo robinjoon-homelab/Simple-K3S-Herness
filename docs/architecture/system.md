@@ -1,42 +1,28 @@
 # 홈랩 하네스 전체 설계
 
-전체 앱과 배포·운영 서비스의 대표 관계도는 [단일 draw.io 다이어그램](docs/diagrams/README.md)이다. 개인용 앱들은 동등한 배포 대상이며 특정 앱이 중심이 아니다. 그림은 이 관계도 하나로 관리하고, 이 문서는 관계도에 나타난 요소의 책임·흐름·운영 전제를 글과 표로 설명한다. 새 에이전트는 [공통 시작 지침](AGENTS.md)에서 시스템 요약과 작업별 읽기 경로를 먼저 확인한다.
+`Simple-K3S-Herness`는 `robinjoon-homelab`의 개인용 앱과 공통 홈랩 인프라를 관리하는 배포 하네스다. 워크로드 계약, 공통 Helm Chart, 인프라 선언, 구성 CLI, 릴리스·워크로드 적용 워크플로, 공통 Secret 조회 Action을 소유한다. 하네스 자체 서비스인 배포 요청 API의 소스와 이미지 빌드도 이 저장소에서 관리한다.
 
-## 문서의 수준과 검토 기준
+직접 개발한 앱과 직접 설치한 오픈소스 서비스는 동등한 배포 대상이다. 노션 블로그나 SMS를 구조의 중심에 두지 않는다. 일반 앱의 소스와 빌드 CI는 각 앱 저장소가, SMS 구현은 별도 비공개 `Secret-Manager-System` 저장소가 소유한다. 비밀 값은 하네스 Git에 보관하지 않는다.
 
-이 문서는 C4의 **시스템 관계(L1)와 컨테이너(L2)** 수준에서 각 요소의 책임과 연결을 설명한다. 두 수준은 절을 나누어 설명하며 별도 그림을 두지 않는다. C4의 컨테이너는 실행 프로그램이나 데이터 저장소를 뜻하며 Docker 컨테이너와 같은 뜻이 아니다. 공통 Action은 CI job 안에서 실행되는 코드이므로 독립 서버로 그리지 않는다.
+## 문서 범위
 
-| 문서 | 대상 독자와 추상화 수준 | 포함하는 내용 | 포함하지 않는 내용 |
-| --- | --- | --- | --- |
-| 이 문서 | 시스템을 이해하는 운영자·개발자; L1/L2 | 관계, 실행·저장 책임, 데이터 흐름, 기능 경계 | API 필드, SQL, Action 파일 내용 |
-| [Secret Manage System](docs/SECRET_MANAGE_SYSTEM.md) | 하네스 배포 담당자와 Action 구현자; SMS를 하나의 서비스로 보는 외부 계약 | CI 조회 API·인증, 운영자 직접 관리 경로, 배포 입력·저장 책임 | 내부 DB 스키마, 관리 API·UI 상세, 전체 CI YAML, 클래스·메서드 설계 |
-| [공통 GitHub Action](docs/GITHUB_ACTION.md) | Action 구현자와 앱 CI 작성자; L3 컴포넌트와 사용 계약 | 입력, 실행 책임, 패키지와 호출 예시 | DB 스키마·운영, 시크릿 관리 앱 내부 구현 |
-| [워크로드 플랫폼 설계](docs/WORKLOAD_PLATFORM.md) | 기존 하네스를 운영·확장하는 운영자와 AI 에이전트; 이번 설계 이전부터 유지되는 기준 문서 | 워크로드 계약과 처리 흐름, 공유 DB·레지스트리 모델, 에이전트·CI 인터페이스 계약, Argo CD 정책 | SMS, 공통 Action, CI 자격증명 조회 |
+이 문서는 C4의 시스템 관계(L1)와 컨테이너(L2) 수준에서 책임과 연결을 설명한다. 여기서 컨테이너는 실행 프로그램이나 데이터 저장소를 뜻한다. 공통 Action은 호출 앱의 CI job 안에서 실행된다. API 필드와 입력 규칙은 [계약 문서](../README.md#구조와-계약)가 정한다. [C4의 수준](https://c4model.com/diagrams), [컨테이너의 의미](https://c4model.com/diagrams/container)
 
-C4의 수준은 문서의 관심사를 정하는 기준으로 사용한다. HTTP·JSON·YAML 예시는 해당 상세 문서의 외부 계약을 설명하기 위해 사용하며, 모든 문서를 클래스 수준까지 확장하지 않는다. [C4의 수준](https://c4model.com/diagrams), [컨테이너의 의미](https://c4model.com/diagrams/container)
+시스템 그림은 [단일 draw.io 관계도](../diagrams/README.md)로 관리한다. 이 문서는 별도 그림 없이 글·목록·표로 책임과 흐름을 설명한다. 새 에이전트는 [공통 시작 지침](../../AGENTS.md)에서 작업별 읽기 경로를 먼저 확인한다.
 
-작성 전 정한 전체 설계 검토 기준:
+## 운영 원칙
 
-- **O1 — 수준:** L1은 사람·시스템, L2는 실행 단위·저장소와 직접 연결된 사람·외부 시스템만 다룬다.
-- **O2 — 관계:** 각 관계는 누가 무엇을 주거나 요청하는지 설명한다. Action은 호출 앱의 CI job 안에 있고, GitHub가 실행 신원을 발급한다.
-- **O3 — 경계:** 운영자는 SMS에서 CI 값을 직접 관리하고 하네스는 관리 API를 호출하지 않는다. CI 자격증명 전달과 배포된 앱의 실행 설정을 구분하며, SMS에서 앱의 Kubernetes Secret으로 이어지는 쓰기 경로는 없다.
-- **O4 — 단순화:** 앱 간 격리 최소화, 공통 자격증명 공유, GitHub-hosted runner 사용을 유지한다. 앱별 ACL이나 셀프 호스팅 러너를 추가하지 않는다.
-- **O5 — 일관성:** 상세 계약은 두 하위 문서가 소유한다. 현재 구성·향후 제안·검증 완료 여부를 구분하고 깨진 링크나 서로 다른 계약을 남기지 않는다.
+**제1원칙은 앱 간 격리 최소화다.** 단일 운영자의 앱과 허용 저장소를 함께 신뢰한다. 앱별 namespace와 논리 DB 이름은 운영상의 구분이며 PostgreSQL 인스턴스·계정과 레지스트리 계정은 공유한다. 외부 접근 인증과 Git·로그로의 비밀 값 노출 방지는 유지한다.
 
-## 목적과 원칙
+배포 대상은 공통 Helm Chart가 지원하는 Deployment 기반 앱이다. 운영자·하네스 에이전트는 CLI로, 앱 저장소의 에이전트는 배포 요청 API로 배포 계약을 변경한다. 앱 CI는 이미지를 발행한 뒤 릴리스 워크플로로 기존 이미지 태그만 갱신한다. Argo CD는 원격 Git을 읽으므로 로컬 파일 수정이나 커밋만으로는 배포되지 않는다. 이 인터페이스와 정책은 [워크로드 계약](../contracts/workload.md)이 정한다.
 
-각 앱 레포의 GitHub Secrets에 같은 레지스트리 계정과 하네스 호출 토큰을 반복 보관하는 일을 줄인다. Secret Manage System(이하 시크릿 관리 앱)에 CI 자격증명을 보관하고, 허용된 GitHub Actions 실행이 공통 Action으로 필요한 값을 가져간다.
+Secret Manage System(SMS)은 여러 앱 CI가 쓰는 자격증명을 한곳에 보관한다. 허용된 GitHub Actions 실행은 공통 Action으로 필요한 값을 가져온다. 앱 이름은 값을 선택하는 구분이며 권한 경계가 아니다. 허용된 실행은 다른 앱 이름의 CI 자격증명도 조회할 수 있으므로 한 실행이 침해되면 보관된 CI 자격증명 전체가 영향을 받을 수 있다.
 
-**제1원칙은 앱 간 격리 최소화다.** 단일 운영자의 앱과 허용 레포를 함께 신뢰한다. 앱 이름은 값을 선택하는 구분이며 권한 경계가 아니다. 허용된 실행은 다른 앱 이름의 CI 자격증명도 조회할 수 있고, 각 CI가 필요한 항목을 선택한다. 한 허용 실행이 침해되면 보관된 CI 자격증명 전체가 영향을 받을 수 있다. 외부 접근 인증과 Git·로그로의 비밀 값 노출 방지는 유지한다.
-
-- 배포 대상은 기존 공통 Helm Chart가 지원하는 Deployment 기반 앱이다. AI 에이전트는 기존 CLI로 배포 계약을 변경하고, 앱 CI는 기존 릴리스 경로로 이미지 태그만 갱신한다. 이 기존 하네스의 계약과 정책은 [워크로드 플랫폼 설계](docs/WORKLOAD_PLATFORM.md)가 정의하며 이번 설계로 바뀌지 않는다.
-- 앱별 namespace와 논리적 DB 이름은 운영상의 구분이다. PostgreSQL 인스턴스·계정과 레지스트리 계정은 공유한다.
-- 시크릿 관리 앱은 운영자의 CI 자격증명 관리와 허용된 CI의 조회에 한정한다. 앱 실행용 Kubernetes Secret의 생성·등록·자동 갱신은 하지 않는다.
-- OpenBao, Spring Cloud Config Server, ARC, DinD 러너 인프라는 이번 설계에 포함하지 않는다.
+SMS는 운영자의 CI 자격증명 관리와 허용된 CI의 조회를 담당한다. 운영자가 SMS에 직접 접속하며 하네스와 공통 Action은 관리 API를 호출하지 않는다. SMS는 앱 실행용 Kubernetes Secret을 생성·등록·갱신하지 않는다. OpenBao, Spring Cloud Config Server, ARC, DinD 러너 인프라는 운영 범위에 포함하지 않는다.
 
 ## L1 — 시스템 관계
 
-사람과 소프트웨어 시스템 사이의 관계다. 내부 파일·프로세스와 논리 DB 구분은 다음 수준에서 설명한다. SMS와 공통 Action도 현재 운영 중인 배포 경로에 포함된다. 그림은 [대표 관계도](docs/diagrams/README.md)를 본다.
+사람과 소프트웨어 시스템 사이의 관계다. 내부 파일·프로세스와 논리 DB 구분은 다음 수준에서 설명한다. SMS와 공통 Action도 현재 운영 중인 배포 경로에 포함된다. 그림은 [대표 관계도](../diagrams/README.md)를 본다.
 
 | 주체 | 대상 | 관계 |
 | --- | --- | --- |
@@ -88,7 +74,7 @@ C4의 수준은 문서의 관심사를 정하는 기준으로 사용한다. HTTP
 ## 운영 전제와 장애 영향
 
 - 앱 CI와 하네스 릴리스 job은 GitHub-hosted runner를 사용한다. 셀프 호스팅 러너는 운영하지 않는다.
-- 시크릿 관리 앱은 단일 인스턴스로 운영하며 기존 공유 PostgreSQL의 `secret_manage_system` 논리 DB를 사용한다. 별도 DB 인스턴스·계정·고가용성·자동 장애조치는 추가하지 않는다. 구체적인 저장 계약은 [저장 설계](docs/SECRET_MANAGE_SYSTEM.md)를 따른다.
+- 시크릿 관리 앱은 단일 인스턴스로 운영하며 기존 공유 PostgreSQL의 `secret_manage_system` 논리 DB를 사용한다. 별도 DB 인스턴스·계정·고가용성·자동 장애조치는 추가하지 않는다. 구체적인 저장 계약은 [저장 설계](../contracts/sms.md)를 따른다.
 - 앱 CI에서 시크릿 관리 앱과 zot 양쪽으로 접속 가능해야 한다. OIDC와 네트워크 연결은 별개이며, 한쪽만 연결됐다고 전체 배포가 가능하지는 않다. 시크릿 관리 앱은 HTTPS를 사용한다. 홈 LAN VPN은 Tailscale 서브넷 라우터를 별도 인프라 앱으로 선언하며 OIDC를 대체하지 않는다. 이 VPN은 개인 기기의 홈 LAN 접근용이다. 기존 GitHub-hosted runner의 공개 접근 경로를 VPN으로 전환하는 작업은 포함하지 않는다.
 - SMS 자체 CI는 서비스 중단 중에도 SMS를 배포할 수 있도록 GitHub Secrets를 유지한다. SMS를 사용하는 소비 앱 CI와 이 예외를 구분한다.
 - 시크릿 관리 앱이나 DB가 중단되면 새로운 CI 값 조회가 실패한다. 이미 실행 중인 앱은 이 서비스에 의존하지 않는다. 같은 job이 이미 받은 정적 자격증명이 서비스 중단만으로 무효화되지는 않는다.
@@ -98,14 +84,14 @@ C4의 수준은 문서의 관심사를 정하는 기준으로 사용한다. HTTP
 
 하네스 Git → Argo CD 연결에는 공용 Traefik의 HTTPS 정책도 포함한다. `traefik-policy` Application이 `infrastructure/traefik/resources.yaml`의 HelmChartConfig와 HSTS Middleware를 자동 동기화한다. k3s Helm Controller는 이 설정으로 Traefik을 갱신하고, Traefik은 일반 앱·Argo CD·레지스트리에 HTTP→HTTPS 443 전환과 HTTPS 응답의 HSTS를 공통 적용한다. 시스템 관계도의 서비스나 연결선을 늘리지 않는다.
 
-cert-manager는 기존 인증서 발급·갱신을 담당한다. 일반 앱 Chart는 HTTPS Ingress와 Certificate를 선언하고 앱별 HTTP Ingress·Middleware는 만들지 않는다. Argo CD 자신의 Ingress·서버 설정과 관리 주체는 유지하며 서버 재시작도 필요하지 않다. 정책 적용에는 Traefik의 자동 rollout이 따르고 일시적인 접속 영향이 있을 수 있다. Application 동기화와 Helm Controller의 적용·rollout 완료는 별도로 확인한다. 배포 확인 절차와 실제 검증 기록은 [정책 적용과 확인](docs/runbooks/traefik-https.md)을 따른다.
+cert-manager는 기존 인증서 발급·갱신을 담당한다. 일반 앱 Chart는 HTTPS Ingress와 Certificate를 선언하고 앱별 HTTP Ingress·Middleware는 만들지 않는다. Argo CD 자신의 Ingress·서버 설정과 관리 주체는 유지하며 서버 재시작도 필요하지 않다. 정책 적용에는 Traefik의 자동 rollout이 따르고 일시적인 접속 영향이 있을 수 있다. Application 동기화와 Helm Controller의 적용·rollout 완료는 별도로 확인한다. 배포 확인 절차와 실제 검증 기록은 [정책 적용과 확인](../runbooks/traefik-https.md)을 따른다.
 
 ## 홈 LAN 접근용 VPN
 
 Tailscale Operator와 Connector는 하네스의 인프라 Application으로 관리한다. 외부 개인 기기에서 k3s 안의 단일 서브넷 라우터를 거쳐 `192.168.0.0/24` 전체로 접근한다. 계정과 tailnet 접근 정책·경로 승인은 Tailscale 관리 서비스가 소유하며, Operator OAuth 자격증명은 Git 밖의 Kubernetes Secret에 등록한다. SMS나 공유 DB를 사용하지 않는다.
 
-VPN은 장애 복구용이 아니며 k3s 중단 시 함께 중단된다. 일반 앱의 CLI·공통 Chart·CI 계약은 유지한다. 배포 선언 준비와 실제 접속 검증 상태는 [VPN 운영 절차](docs/runbooks/vpn.md)에서 구분한다. VPN의 내부 구현은 이 문서에서 펼치지 않으며, 전체 관계는 [대표 관계도](docs/diagrams/README.md)에 반영한다.
+VPN은 장애 복구용이 아니며 k3s 중단 시 함께 중단된다. 일반 앱의 CLI·공통 Chart·CI 계약은 유지한다. 배포 선언 준비와 실제 접속 검증 상태는 [VPN 운영 절차](../runbooks/vpn.md)에서 구분한다. VPN의 내부 구현은 이 문서에서 펼치지 않으며, 전체 관계는 [대표 관계도](../diagrams/README.md)에 반영한다.
 
 ## 검증 기록
 
-설계 검토 이후의 실제 연동·배포 확인 결과는 [문서 색인의 검증 기록](docs/README.md#검증-기록)에 주제별로 있다. CI 자격증명 전환 순서는 [CI 자격증명 연동 절차](docs/runbooks/load-ci-secrets.md#기존-ci를-sms로-옮기는-순서)를 따른다.
+설계 검토 이후의 실제 연동·배포 확인 결과는 [문서 색인의 검증 기록](../README.md#검증-기록)에 주제별로 있다. CI 자격증명 전환 순서는 [CI 자격증명 연동 절차](../runbooks/load-ci-secrets.md#기존-ci를-sms로-옮기는-순서)를 따른다.

@@ -6,7 +6,7 @@
 
 클러스터에 Argo CD, Traefik, cert-manager와 `letsencrypt-prod` ClusterIssuer가 먼저 있어야 한다. Root Application은 CNPG, Reflector, 공유 DB, zot, 레지스트리 NetworkPolicy, Tailscale, 공용 Traefik 정책을 설치한다.
 
-공통 워크로드의 HTTPS 정책에는 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·CRD provider, `traefik.io`의 `Middleware` CRD가 필요하다. 자세한 조건은 [워크로드 HTTPS 계약](../WORKLOAD_PLATFORM.md#워크로드-https-계약)에 있다. 정책 적용 확인은 [공용 Traefik HTTPS 정책 적용과 확인](traefik-https.md)을 따른다.
+공통 워크로드의 HTTPS 정책에는 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·CRD provider, `traefik.io`의 `Middleware` CRD가 필요하다. 자세한 조건은 [워크로드 HTTPS 계약](../contracts/workload.md#워크로드-https-계약)에 있다. 정책 적용 확인은 [공용 Traefik HTTPS 정책 적용과 확인](traefik-https.md)을 따른다.
 
 ## 1. DNS와 외부 접근
 
@@ -60,4 +60,4 @@ kubectl -n database-system annotate secret shared-db-app --overwrite \
   reflector.v1.k8s.emberstack.com/reflection-auto-namespaces-selector="simple-k3s-harness.dev/workload=true"
 ```
 
-위 명령은 복제 범위를 정하는 metadata만 추가하고 CNPG가 관리하는 `data`는 고치지 않는다. 워크로드가 이 Secret에서 쓸 수 있는 키와 `DB_HOST` 주입 규칙은 [워크로드 계약의 데이터베이스 모델](../WORKLOAD_PLATFORM.md#3-데이터베이스-모델)이 정한다.
+위 명령은 복제 범위를 정하는 metadata만 추가하고 CNPG가 관리하는 `data`는 고치지 않는다. 워크로드가 이 Secret에서 쓸 수 있는 키와 `DB_HOST` 주입 규칙은 [워크로드 계약의 데이터베이스 모델](../contracts/workload.md#3-데이터베이스-모델)이 정한다.

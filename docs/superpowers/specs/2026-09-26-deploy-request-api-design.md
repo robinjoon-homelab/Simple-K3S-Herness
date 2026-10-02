@@ -120,7 +120,7 @@ Content-Type: application/json
 - 인증: `gh auth token` 값을 Bearer 토큰으로 보낸다.
 - 흐름: `GET /v1/schema` → `GET /v1/apps/{name}` → `POST` 또는 `PATCH` → `GET /v1/runs/{runId}` 폴링.
 - 요청 예시, 배열 교체 규칙, `If-Match` 사용법, 409를 받았을 때 다시 읽고 재요청하는 절차.
-- 앱 CI에 이미지 태그 릴리스를 추가하는 방법: 공통 Action으로 `zot`·`harness`를 조회하고 기존 릴리스 workflow를 dispatch하는 예시. [공통 Action 문서](../../GITHUB_ACTION.md)의 호출 예시와 같게 유지한다.
+- 앱 CI에 이미지 태그 릴리스를 추가하는 방법: 공통 Action으로 `zot`·`harness`를 조회하고 기존 릴리스 workflow를 dispatch하는 예시. [공통 Action 문서](../../contracts/load-ci-secrets.md)의 호출 예시와 같게 유지한다.
 - 하지 않는 일: 비밀 값 저장, Kubernetes Secret 생성, 삭제, 클러스터 상태 보고.
 
 ### 4.4 결과 조회

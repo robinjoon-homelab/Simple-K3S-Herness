@@ -17,23 +17,17 @@
 
 ## 2. 처리 흐름
 
-```text
-AI 에이전트
-  │ tools/platform.py (create/get/patch)
-  ▼
-workloads/<app>/values.json + argocd/managed/apps/<app>.yaml
-  │ Git push
-  ▼
-Argo CD Root Application → Child Application → 공통 Helm Chart → K3s
+배포 구성을 생성·수정하는 흐름은 다음과 같다.
 
-앱 CI (이미지 push 완료)
-  │ workflow_dispatch (app/container/tag)
-  ▼
-GitHub Actions → tools/release.py (기존 이미지 태그만 변경)
-  │ Git commit/push
-  ▼
-Argo CD Child Application → 공통 Helm Chart → K3s
-```
+1. 운영자나 하네스의 AI 에이전트가 `tools/platform.py`의 `create`·`get`·`patch`로 워크로드를 조회하거나 변경한다. CLI가 관리하는 파일은 `workloads/<app>/values.json`과 `argocd/managed/apps/<app>.yaml`이다.
+2. 운영자가 변경을 커밋·push하면 Argo CD Root Application이 Child Application을 동기화한다.
+3. Child Application은 공통 Helm Chart로 워크로드를 렌더링하고 k3s에 적용한다. 앱 저장소의 에이전트는 [배포 요청 API와 워크로드 적용 workflow](#배포-요청-api와-워크로드-적용-workflow)로 같은 CLI를 호출한다.
+
+앱 CI는 기존 컨테이너의 이미지 태그만 바꾼다.
+
+1. 앱 CI가 이미지를 발행한 뒤 `app`·`container`·`tag`를 입력으로 하네스 릴리스 workflow를 호출한다.
+2. 하네스의 GitHub Actions job이 `tools/release.py`로 태그를 바꾸고 커밋·push한다.
+3. Argo CD Child Application이 공통 Helm Chart로 변경된 워크로드를 렌더링해 k3s에 적용한다.
 
 Chart가 계약에 따라 다음 리소스를 렌더링한다.
 
@@ -55,7 +49,7 @@ Chart는 각 Ingress 선언에 대해 `websecure` entrypoint의 TLS Ingress 하�
 
 HTTP→HTTPS와 HSTS는 `default` Project의 `traefik-policy` Application이 관리하는 공통 인프라 정책이다. `infrastructure/traefik/resources.yaml`은 `kube-system/platform-https-headers` Middleware와 `kube-system/traefik` HelmChartConfig를 선언한다. HelmChartConfig는 `ports.web.http.redirections.entryPoint`로 `websecure`의 외부 443 포트에 영구 리다이렉트하고, `ports.websecure.http`에서 TLS와 공용 HSTS Middleware를 적용한다. HSTS는 `max-age=31536000`이며 `includeSubDomains`·`preload`는 사용하지 않는다. 이 정책은 일반 앱·Argo CD·레지스트리를 포함한 Traefik 웹 접속에 공통으로 적용한다. cert-manager는 기존 인증서 발급·갱신을 계속 담당한다.
 
-배포 전 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·CRD provider, `traefik.io`의 `Middleware` CRD와 k3s Helm Controller가 준비되어 있어야 한다. cert-manager와 플랫폼에서 지정한 ClusterIssuer도 필요하다. 공용 정책의 Application 동기화 이후 Helm Controller가 실제 Traefik 설정을 갱신하고 자동 rollout을 완료했는지 확인한다. Argo CD 서버 설정과 기존 리소스 관리 주체는 바뀌지 않고 서버 재시작도 필요하지 않다. 로컬 `validate`·`render` 성공은 정책 적용이나 실제 접속 검증을 대신하지 않는다. 적용 확인은 [공용 Traefik HTTPS 정책 적용과 확인](runbooks/traefik-https.md)을 따른다.
+배포 전 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·CRD provider, `traefik.io`의 `Middleware` CRD와 k3s Helm Controller가 준비되어 있어야 한다. cert-manager와 플랫폼에서 지정한 ClusterIssuer도 필요하다. 공용 정책의 Application 동기화 이후 Helm Controller가 실제 Traefik 설정을 갱신하고 자동 rollout을 완료했는지 확인한다. Argo CD 서버 설정과 기존 리소스 관리 주체는 바뀌지 않고 서버 재시작도 필요하지 않다. CLI의 내장 검증과 로컬 Helm 렌더링은 정책 적용이나 실제 접속 검증을 대신하지 않는다. 적용 확인은 [공용 Traefik HTTPS 정책 적용과 확인](../runbooks/traefik-https.md)을 따른다.
 
 ## 3. 데이터베이스 모델
 
@@ -77,7 +71,7 @@ zot에 내장된 htpasswd 인증과 저장소 ACL을 사용하고 익명 접근�
 
 이 구성은 홈랩용 단일 인스턴스이므로 고가용성을 제공하지 않는다. zot 또는 해당 노드가 중단되면 새 Pod의 이미지 pull과 신규 배포가 실패할 수 있지만, 이미 실행 중인 Pod는 이미지를 다시 요청하지 않는 한 계속 동작한다. `local-path` 볼륨의 스냅샷과 외부 백업, 복구 검증은 이 저장소 밖의 운영 책임이며, 노드나 디스크를 잃으면 백업이 없는 이미지는 복구할 수 없다.
 
-`registry.homelab.robinjoon.xyz`가 Traefik 진입점을 가리키도록 하는 DNS 레코드는 외부 접근의 선행 조건이지만 이 저장소에서 생성하지 않는다. Tailscale Operator와 홈 LAN 서브넷 라우터는 `default` Project의 별도 인프라 Application으로 선언한다. 공식 전용 Chart와 Connector를 사용하며 일반 워크로드 계약의 지원 범위를 확장하지 않는다. 계정·tailnet 접근 정책·경로 승인은 외부 Tailscale 관리 영역에 남고, OAuth 자격증명은 Git 밖의 Kubernetes Secret으로 등록한다. VPN은 zot 인증과 ACL을 대체하지 않으며 TLS와 zot 접근 제어는 유지한다. 설치 절차는 [VPN 운영 절차](runbooks/vpn.md)를 따른다.
+`registry.homelab.robinjoon.xyz`가 Traefik 진입점을 가리키도록 하는 DNS 레코드는 외부 접근의 선행 조건이지만 이 저장소에서 생성하지 않는다. Tailscale Operator와 홈 LAN 서브넷 라우터는 `default` Project의 별도 인프라 Application으로 선언한다. 공식 전용 Chart와 Connector를 사용하며 일반 워크로드 계약의 지원 범위를 확장하지 않는다. 계정·tailnet 접근 정책·경로 승인은 외부 Tailscale 관리 영역에 남고, OAuth 자격증명은 Git 밖의 Kubernetes Secret으로 등록한다. VPN은 zot 인증과 ACL을 대체하지 않으며 TLS와 zot 접근 제어는 유지한다. 설치 절차는 [VPN 운영 절차](../runbooks/vpn.md)를 따른다.
 
 ## 5. 변경 인터페이스 계약
 
@@ -101,7 +95,7 @@ VPN 인프라가 사용하는 `tailscale` namespace는 일반 앱 이름으로 �
 
 ### 배포 요청 API와 워크로드 적용 workflow
 
-앱 레포의 에이전트는 [배포 요청 API](DEPLOY_API.md)를 사용한다. 서버는 조회를 GitHub API로 처리하고, 생성·수정은 호출자 GitHub 토큰으로 `.github/workflows/apply-workload.yml`을 실행한다. 이 workflow는 입력을 `platform.py create`·`patch --if-match` 인자로 넘기고, 변경 파일 범위를 확인한 뒤 릴리스 workflow와 같은 동시성 그룹에서 커밋·push한다. 계약 판단은 CLI만 한다.
+앱 레포의 에이전트는 [배포 요청 API](deploy-api.md)를 사용한다. 서버는 조회를 GitHub API로 처리하고, 생성·수정은 호출자 GitHub 토큰으로 `.github/workflows/apply-workload.yml`을 실행한다. 이 workflow는 입력을 `platform.py create`·`patch --if-match` 인자로 넘기고, 변경 파일 범위를 확인한 뒤 릴리스 workflow와 같은 동시성 그룹에서 커밋·push한다. 계약 판단은 CLI만 한다.
 
 ### CI 릴리스 CLI
 

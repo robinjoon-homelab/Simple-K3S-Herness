@@ -8,12 +8,12 @@
 
 | 문서 | 다루는 내용 |
 | --- | --- |
-| [전체 설계](../SYSTEM_DESIGN.md) | 서비스·저장소의 책임, 신뢰 경계, 주요 흐름, 장애 영향 |
+| [전체 설계](architecture/system.md) | 서비스·저장소의 책임, 신뢰 경계, 주요 흐름, 장애 영향 |
 | [대표 관계도](diagrams/README.md) | 유일한 시스템 그림과 범례 |
-| [워크로드 계약](WORKLOAD_PLATFORM.md) | 워크로드 JSON 계약, 공유 DB·레지스트리 모델, CLI·릴리스 인터페이스, Argo CD 정책 |
-| [배포 요청 API 계약](DEPLOY_API.md) | API 엔드포인트, 요청·오류, 인증과 권한 |
-| [SMS 외부 계약](SECRET_MANAGE_SYSTEM.md) | CI 조회 API, OIDC 조건, 배포 입력과 저장 책임 |
-| [공통 Action 계약](GITHUB_ACTION.md) | `load-ci-secrets` Action의 입력·전달·실패 규칙과 소스 구조 |
+| [워크로드 계약](contracts/workload.md) | 워크로드 JSON 계약, 공유 DB·레지스트리 모델, CLI·릴리스 인터페이스, Argo CD 정책 |
+| [배포 요청 API 계약](contracts/deploy-api.md) | API 엔드포인트, 요청·오류, 인증과 권한 |
+| [SMS 외부 계약](contracts/sms.md) | CI 조회 API, OIDC 조건, 배포 입력과 저장 책임 |
+| [공통 Action 계약](contracts/load-ci-secrets.md) | `load-ci-secrets` Action의 입력·전달·실패 규칙과 검증 기준 |
 
 ## 운영 절차
 

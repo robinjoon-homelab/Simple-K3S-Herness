@@ -1,18 +1,13 @@
 # 배포 요청 API
 
-앱 레포에서 일하는 에이전트가 하네스 워크로드를 조회·생성·수정하는 HTTP 창구다. 에이전트용 사용 안내는 서버의 `GET /`가 제공하며 원본은 [`server/deploy_api/guide.md`](../server/deploy_api/guide.md)다. 이 문서는 운영자와 하네스 개발자를 위한 외부 계약과 운영 조건을 설명한다. 설계 배경은 [설계 spec](superpowers/specs/2026-09-26-deploy-request-api-design.md)에 있다.
+앱 레포에서 일하는 에이전트가 하네스 워크로드를 조회·생성·수정하는 HTTP 창구다. 에이전트용 사용 안내는 서버의 `GET /`가 제공하며 원본은 [`server/deploy_api/guide.md`](../../server/deploy_api/guide.md)다. 이 문서는 운영자와 하네스 개발자를 위한 외부 계약과 운영 조건을 설명한다. 설계 배경은 [설계 spec](../superpowers/specs/2026-09-26-deploy-request-api-design.md)에 있다.
 
 ## 역할과 경계
 
-```text
-앱 에이전트 ──(GitHub 토큰)──▶ 배포 요청 API (k3s, deploy-api)
-                                 │ 조회: GitHub API로 하네스 main 읽기
-                                 │ 생성·수정: 호출자 토큰으로 apply-workload.yml 실행
-                                 ▼
-                     GitHub Actions: platform.py create / patch → commit/push
-                                 ▼
-                     Argo CD → 공통 Helm Chart → k3s
-```
+1. 앱 에이전트가 GitHub 토큰으로 k3s의 배포 요청 API(`deploy-api`)를 호출한다.
+2. 서버는 GitHub API로 하네스 `main`의 워크로드를 조회한다. 생성·수정 요청은 호출자 토큰으로 `apply-workload.yml`을 실행한다.
+3. GitHub Actions job이 `platform.py create`·`patch`로 파일을 바꾸고 커밋·push한다.
+4. Argo CD가 공통 Helm Chart로 변경된 워크로드를 렌더링해 k3s에 적용한다.
 
 | 구성 요소 | 하는 일 | 하지 않는 일 |
 | --- | --- | --- |
@@ -66,4 +61,4 @@ workflow 안에서 CLI가 실패한 경우는 HTTP 오류가 아니라 결과의
 - 토큰 원문은 로그, 오류 응답, 예외 메시지, 캐시 키에 남기지 않는다. artifact 다운로드 리다이렉트처럼 GitHub API 밖의 호스트에는 토큰을 보내지 않는다.
 - Actions 실행 기록의 actor가 요청한 GitHub 사용자이므로 변경 이력을 GitHub에서 추적한다.
 
-서버의 빌드·배포와 동작 점검은 [배포 요청 API 운영 절차](runbooks/deploy-api.md)를, 지난 확인 결과는 [검증 기록](records/deploy-api.md)을 본다.
+서버의 빌드·배포와 동작 점검은 [배포 요청 API 운영 절차](../runbooks/deploy-api.md)를, 지난 확인 결과는 [검증 기록](../records/deploy-api.md)을 본다.

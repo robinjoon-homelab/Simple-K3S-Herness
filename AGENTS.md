@@ -17,7 +17,7 @@ k3s의 공통 서비스는 Argo CD(GitOps 동기화), zot(이미지), 공유 Pos
 
 하네스는 `traefik-policy` Application으로 공용 Traefik의 HTTPS 정책을 관리한다. `infrastructure/traefik/resources.yaml`의 `HelmChartConfig`와 공용 HSTS Middleware가 일반 앱·Argo CD·레지스트리에 HTTP→HTTPS 443 전환과 HSTS를 적용한다. cert-manager는 기존 인증서 발급·갱신을 담당한다. push 후 k3s Helm Controller가 Traefik을 갱신하므로 Application의 Synced 상태와 Traefik 적용 완료는 구분한다. Traefik 갱신 중 일시적인 접속 영향이 있을 수 있으며 Argo CD 서버 재시작은 필요하지 않다. 적용 확인은 `docs/runbooks/traefik-https.md`를 따른다.
 
-공통 워크로드 Chart의 Ingress는 Traefik과 cert-manager TLS를 필수로 사용한다. HTTP 요청은 HTTPS로 전환하고 앱 응답은 HTTPS 경로에서만 제공하며, 워크로드 values로 이 정책을 해제할 수 없다. Ingress가 없는 내부 앱은 계속 지원한다. 상세 계약과 Traefik 사전 조건은 `docs/WORKLOAD_PLATFORM.md`를 따른다.
+공통 워크로드 Chart의 Ingress는 Traefik과 cert-manager TLS를 필수로 사용한다. HTTP 요청은 HTTPS로 전환하고 앱 응답은 HTTPS 경로에서만 제공하며, 워크로드 values로 이 정책을 해제할 수 없다. Ingress가 없는 내부 앱은 계속 지원한다. 상세 계약과 Traefik 사전 조건은 `docs/contracts/workload.md`를 따른다.
 
 CI와 앱 실행용 비밀은 다음처럼 구분한다.
 
@@ -31,14 +31,14 @@ CI와 앱 실행용 비밀은 다음처럼 구분한다.
 
 | 작업 | 먼저 읽을 문서 |
 | --- | --- |
-| 전체 관계·책임 경계 확인 | [전체 설계](SYSTEM_DESIGN.md) |
-| 앱 추가·배포 구성 수정 | [워크로드 스킬](skills/homelab-k3s-workloads/SKILL.md), [워크로드 계약](docs/WORKLOAD_PLATFORM.md) |
-| 하네스 CLI·Chart·공통 인프라 자체 개발 | [워크로드 계약](docs/WORKLOAD_PLATFORM.md), [테스트](docs/development/testing.md), 해당 [운영 절차](docs/README.md#운영-절차) |
+| 전체 관계·책임 경계 확인 | [전체 설계](docs/architecture/system.md) |
+| 앱 추가·배포 구성 수정 | [워크로드 스킬](skills/homelab-k3s-workloads/SKILL.md), [워크로드 계약](docs/contracts/workload.md) |
+| 하네스 CLI·Chart·공통 인프라 자체 개발 | [워크로드 계약](docs/contracts/workload.md), [테스트](docs/development/testing.md), 해당 [운영 절차](docs/README.md#운영-절차) |
 | 공용 Traefik HTTPS·HSTS 정책 | [정책 적용과 확인](docs/runbooks/traefik-https.md) |
 | 홈 네트워크 VPN 설치·인증·접속 확인 | [VPN 운영 절차](docs/runbooks/vpn.md) |
-| SMS와의 연결·허용 정책 확인 | [SMS 외부 계약](docs/SECRET_MANAGE_SYSTEM.md), [CI 자격증명 연동 절차](docs/runbooks/load-ci-secrets.md); 내부 변경은 SMS 구현 저장소에서 수행 |
-| 공통 Action 수정·소비 앱 CI 연결 | [공통 Action](docs/GITHUB_ACTION.md), [CI 자격증명 연동 절차](docs/runbooks/load-ci-secrets.md) |
-| 배포 요청 API·앱 에이전트 연동 | [배포 요청 API](docs/DEPLOY_API.md), [운영 절차](docs/runbooks/deploy-api.md) |
+| SMS와의 연결·허용 정책 확인 | [SMS 외부 계약](docs/contracts/sms.md), [CI 자격증명 연동 절차](docs/runbooks/load-ci-secrets.md); 내부 변경은 SMS 구현 저장소에서 수행 |
+| 공통 Action 수정·소비 앱 CI 연결 | [공통 Action](docs/contracts/load-ci-secrets.md), [Action 개발과 검증](docs/development/testing.md#공통-action-개발과-검증), [CI 자격증명 연동 절차](docs/runbooks/load-ci-secrets.md) |
+| 배포 요청 API·앱 에이전트 연동 | [배포 요청 API](docs/contracts/deploy-api.md), [운영 절차](docs/runbooks/deploy-api.md) |
 | 레지스트리·초기 연동 운영 | [레지스트리](docs/runbooks/registry.md), [초기 연동](docs/runbooks/bootstrap.md) |
 | 문서 작성·수정 | [문서 작성 규칙](docs/development/documentation.md). 수정 후 확인 목록으로 점검한다 |
 

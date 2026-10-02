@@ -1,6 +1,6 @@
 # 배포 요청 API 운영 절차
 
-배포 요청 API 서버(`deploy-api`)를 빌드·배포하고 동작을 점검하는 절차다. API의 동작 규칙은 [배포 요청 API 계약](../DEPLOY_API.md)이, 앱 에이전트용 사용 안내는 [`server/deploy_api/guide.md`](../../server/deploy_api/guide.md)가 정한다. 지난 확인 결과는 [검증 기록](../records/deploy-api.md)에 있다.
+배포 요청 API 서버(`deploy-api`)를 빌드·배포하고 동작을 점검하는 절차다. API의 동작 규칙은 [배포 요청 API 계약](../contracts/deploy-api.md)이, 앱 에이전트용 사용 안내는 [`server/deploy_api/guide.md`](../../server/deploy_api/guide.md)가 정한다. 지난 확인 결과는 [검증 기록](../records/deploy-api.md)에 있다.
 
 ## 구성
 

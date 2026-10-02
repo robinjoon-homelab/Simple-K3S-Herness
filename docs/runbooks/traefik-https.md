@@ -1,6 +1,6 @@
 # 공용 Traefik HTTPS 정책 적용과 확인
 
-`infrastructure/traefik/resources.yaml`을 바꾼 뒤 정책이 실제 Traefik에 적용됐는지 확인하는 절차다. 정책의 의미와 워크로드 Ingress 계약은 [워크로드 HTTPS 계약](../WORKLOAD_PLATFORM.md#워크로드-https-계약)이 정한다. 지난 확인 결과는 [검증 기록](../records/traefik-https.md)에 있다.
+`infrastructure/traefik/resources.yaml`을 바꾼 뒤 정책이 실제 Traefik에 적용됐는지 확인하는 절차다. 정책의 의미와 워크로드 Ingress 계약은 [워크로드 HTTPS 계약](../contracts/workload.md#워크로드-https-계약)이 정한다. 지난 확인 결과는 [검증 기록](../records/traefik-https.md)에 있다.
 
 ## 정책 요약
 

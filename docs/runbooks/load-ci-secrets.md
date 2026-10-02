@@ -1,6 +1,6 @@
 # CI 자격증명 연동 절차
 
-앱 CI가 SMS에서 레지스트리·하네스 자격증명을 받아 이미지를 발행하고 하네스 릴리스를 요청하도록 연결하는 절차다. Action의 입력·출력 규칙은 [공통 Action 계약](../GITHUB_ACTION.md)이, SMS의 조회 API와 OIDC 조건은 [SMS 외부 계약](../SECRET_MANAGE_SYSTEM.md)이 정한다. 앱 에이전트용 CI 예제는 [`server/deploy_api/guide.md`](../../server/deploy_api/guide.md)에도 있다. 지난 확인 결과는 [검증 기록](../records/ci-secrets.md)에 있다.
+앱 CI가 SMS에서 레지스트리·하네스 자격증명을 받아 이미지를 발행하고 하네스 릴리스를 요청하도록 연결하는 절차다. Action의 입력·출력 규칙은 [공통 Action 계약](../contracts/load-ci-secrets.md)이, SMS의 조회 API와 OIDC 조건은 [SMS 외부 계약](../contracts/sms.md)이 정한다. 앱 에이전트용 CI 예제는 [`server/deploy_api/guide.md`](../../server/deploy_api/guide.md)에도 있다. 지난 확인 결과는 [검증 기록](../records/ci-secrets.md)에 있다.
 
 ## SMS 허용 정책 등록
 
