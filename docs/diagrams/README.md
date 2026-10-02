@@ -8,7 +8,7 @@
 - CNPG와 공유 PostgreSQL은 하나의 DB 서비스로 합친다.
 - Reflector는 실행용 시크릿 관리에 포함한다.
 - Argo CD, zot, cert-manager, k3s Secrets, SMS와 Tailscale VPN은 각각 역할만 표시한다.
-- Tailscale VPN은 홈 LAN 접근용이며 장애 복구용이 아니다. 인증 등록·외부 접속 검증 상태는 [VPN 운영 절차](../VPN.md)를 따른다.
+- Tailscale VPN은 홈 LAN 접근용이며 장애 복구용이 아니다. 인증 등록·외부 접속 검증 상태는 [VPN 운영 절차](../runbooks/vpn.md)를 따른다.
 - 개인용 앱들은 동등한 배포 대상 하나의 그룹으로 표시한다. 특정 앱이 구조의 중심이 되지 않는다.
 
 주 배포 흐름은 왼쪽에서 오른쪽으로 한 줄에 배치한다.
@@ -28,4 +28,4 @@
 
 화살표는 라벨에 적힌 호출·처리·값 공급 방향이다. 주 배포 흐름의 Git → Argo CD와 이미지 경로의 zot → k3s는 정보 공급 방향으로 그렸으며, 실제 조회·pull 주체를 라벨에 명시했다. 응답선과 서비스 내부 동작은 생략했다. 현재 SMS는 PostgreSQL에 CI 시크릿과 허용 정책을 저장하고, SMS 자체 CI는 서비스 중단 중에도 배포할 수 있도록 GitHub Secrets를 사용한다. SMS의 Kubernetes Secret 직접 저장 제안은 현재 구조에 포함하지 않았다.
 
-기존 하네스 Git → Argo CD 연결에는 `traefik-policy`의 공용 접속 정책도 포함한다. HelmChartConfig와 공용 Middleware로 Traefik의 HTTP→HTTPS 전환·HSTS를 설정하며, 일반 앱·Argo CD·레지스트리에 함께 적용한다. 인증서 발급·갱신은 cert-manager가 담당한다. 기존 기본 접속 기능 안의 정책이므로 상자나 연결선은 추가하지 않는다. Argo CD 서버 재시작은 필요하지 않으며, Traefik의 Helm 적용과 자동 rollout은 Application 동기화와 별도로 확인한다. [정책과 적용 확인](../../README.md#공용-traefik-https-정책)을 따른다.
+기존 하네스 Git → Argo CD 연결에는 `traefik-policy`의 공용 접속 정책도 포함한다. HelmChartConfig와 공용 Middleware로 Traefik의 HTTP→HTTPS 전환·HSTS를 설정하며, 일반 앱·Argo CD·레지스트리에 함께 적용한다. 인증서 발급·갱신은 cert-manager가 담당한다. 기존 기본 접속 기능 안의 정책이므로 상자나 연결선은 추가하지 않는다. Argo CD 서버 재시작은 필요하지 않으며, Traefik의 Helm 적용과 자동 rollout은 Application 동기화와 별도로 확인한다. [정책 적용과 확인](../runbooks/traefik-https.md)을 따른다.

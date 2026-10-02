@@ -13,9 +13,9 @@
 
 앱 레포에서 일하는 에이전트는 배포 요청 API(`https://deploy.homelab.robinjoon.xyz`)로 워크로드를 조회·생성·수정한다. API는 GitHub API로 조회하고 호출자 GitHub 토큰으로 `apply-workload.yml`을 실행하며, 그 workflow가 CLI로 파일을 수정해 커밋한다. 서버는 파일 수정·클러스터 접근·비밀 값 보관을 하지 않는다.
 
-k3s의 공통 서비스는 Argo CD(GitOps 동기화), zot(이미지), 공유 PostgreSQL/CNPG(DB), Kubernetes Secrets(실행 설정), cert-manager(TLS)이며 Traefik은 기본 앱 접속을 담당한다. SMS도 하네스로 배포하는 서비스다. 다이어그램에서는 이 서비스들을 내부 컨트롤러까지 나누지 않는다. Tailscale 서브넷 라우터는 홈 LAN 접근용 별도 인프라 앱으로 배포하며 장애 복구용이 아니다. Tailscale 계정·tailnet 정책·DNS는 외부 계층에서 관리한다. VPN의 초기 인증 등록과 접속 검증 상태는 `docs/VPN.md`를 확인한다.
+k3s의 공통 서비스는 Argo CD(GitOps 동기화), zot(이미지), 공유 PostgreSQL/CNPG(DB), Kubernetes Secrets(실행 설정), cert-manager(TLS)이며 Traefik은 기본 앱 접속을 담당한다. SMS도 하네스로 배포하는 서비스다. 다이어그램에서는 이 서비스들을 내부 컨트롤러까지 나누지 않는다. Tailscale 서브넷 라우터는 홈 LAN 접근용 별도 인프라 앱으로 배포하며 장애 복구용이 아니다. Tailscale 계정·tailnet 정책·DNS는 외부 계층에서 관리한다. VPN의 초기 인증 등록과 접속 확인 절차는 `docs/runbooks/vpn.md`에 있다.
 
-하네스는 `traefik-policy` Application으로 공용 Traefik의 HTTPS 정책을 관리한다. `infrastructure/traefik/resources.yaml`의 `HelmChartConfig`와 공용 HSTS Middleware가 일반 앱·Argo CD·레지스트리에 HTTP→HTTPS 443 전환과 HSTS를 적용한다. cert-manager는 기존 인증서 발급·갱신을 담당한다. push 후 k3s Helm Controller가 Traefik을 갱신하므로 Application의 Synced 상태와 Traefik 적용 완료는 구분한다. Traefik 갱신 중 일시적인 접속 영향이 있을 수 있으며 Argo CD 서버 재시작은 필요하지 않다. 적용 확인은 README의 공용 Traefik HTTPS 정책 절을 따른다.
+하네스는 `traefik-policy` Application으로 공용 Traefik의 HTTPS 정책을 관리한다. `infrastructure/traefik/resources.yaml`의 `HelmChartConfig`와 공용 HSTS Middleware가 일반 앱·Argo CD·레지스트리에 HTTP→HTTPS 443 전환과 HSTS를 적용한다. cert-manager는 기존 인증서 발급·갱신을 담당한다. push 후 k3s Helm Controller가 Traefik을 갱신하므로 Application의 Synced 상태와 Traefik 적용 완료는 구분한다. Traefik 갱신 중 일시적인 접속 영향이 있을 수 있으며 Argo CD 서버 재시작은 필요하지 않다. 적용 확인은 `docs/runbooks/traefik-https.md`를 따른다.
 
 공통 워크로드 Chart의 Ingress는 Traefik과 cert-manager TLS를 필수로 사용한다. HTTP 요청은 HTTPS로 전환하고 앱 응답은 HTTPS 경로에서만 제공하며, 워크로드 values로 이 정책을 해제할 수 없다. Ingress가 없는 내부 앱은 계속 지원한다. 상세 계약과 Traefik 사전 조건은 `docs/WORKLOAD_PLATFORM.md`를 따른다.
 
@@ -27,18 +27,20 @@ CI와 앱 실행용 비밀은 다음처럼 구분한다.
 
 ## 작업별 문서
 
-전체 관계의 대표 그림은 [단일 draw.io 관계도와 설명](docs/diagrams/README.md)이다. 이미지 도구가 없어도 위 요약과 해당 문서의 텍스트로 관계를 파악할 수 있다. 다음 상세 문서는 관련 작업에만 읽으며, 매 세션 모든 API 필드와 운영 명령을 로딩할 필요는 없다.
+전체 관계의 대표 그림은 [단일 draw.io 관계도와 설명](docs/diagrams/README.md)이다. 이미지 도구가 없어도 위 요약과 해당 문서의 텍스트로 관계를 파악할 수 있다. 사람용 전체 문서 목록은 [문서 색인](docs/README.md)이다. 다음 상세 문서는 관련 작업에만 읽으며, 매 세션 모든 API 필드와 운영 명령을 로딩할 필요는 없다.
 
 | 작업 | 먼저 읽을 문서 |
 | --- | --- |
 | 전체 관계·책임 경계 확인 | [전체 설계](SYSTEM_DESIGN.md) |
 | 앱 추가·배포 구성 수정 | [워크로드 스킬](skills/homelab-k3s-workloads/SKILL.md), [워크로드 계약](docs/WORKLOAD_PLATFORM.md) |
-| 하네스 CLI·Chart·공통 인프라 자체 개발 | [워크로드 계약](docs/WORKLOAD_PLATFORM.md), [운영 README](README.md)의 해당 절 |
-| 공용 Traefik HTTPS·HSTS 정책 | [정책과 적용 확인](README.md#공용-traefik-https-정책) |
-| 홈 네트워크 VPN 설치·인증·접속 확인 | [VPN 운영 절차](docs/VPN.md) |
-| SMS와의 연결·허용 정책 확인 | [SMS 외부 계약](docs/SECRET_MANAGE_SYSTEM.md); 내부 변경은 SMS 구현 저장소에서 수행 |
-| 공통 Action 수정·소비 앱 CI 연결 | [공통 Action](docs/GITHUB_ACTION.md) |
-| 배포 요청 API·앱 에이전트 연동 | [배포 요청 API](docs/DEPLOY_API.md) |
+| 하네스 CLI·Chart·공통 인프라 자체 개발 | [워크로드 계약](docs/WORKLOAD_PLATFORM.md), [테스트](docs/development/testing.md), 해당 [운영 절차](docs/README.md#운영-절차) |
+| 공용 Traefik HTTPS·HSTS 정책 | [정책 적용과 확인](docs/runbooks/traefik-https.md) |
+| 홈 네트워크 VPN 설치·인증·접속 확인 | [VPN 운영 절차](docs/runbooks/vpn.md) |
+| SMS와의 연결·허용 정책 확인 | [SMS 외부 계약](docs/SECRET_MANAGE_SYSTEM.md), [CI 자격증명 연동 절차](docs/runbooks/load-ci-secrets.md); 내부 변경은 SMS 구현 저장소에서 수행 |
+| 공통 Action 수정·소비 앱 CI 연결 | [공통 Action](docs/GITHUB_ACTION.md), [CI 자격증명 연동 절차](docs/runbooks/load-ci-secrets.md) |
+| 배포 요청 API·앱 에이전트 연동 | [배포 요청 API](docs/DEPLOY_API.md), [운영 절차](docs/runbooks/deploy-api.md) |
+| 레지스트리·초기 연동 운영 | [레지스트리](docs/runbooks/registry.md), [초기 연동](docs/runbooks/bootstrap.md) |
+| 문서 작성·수정 | [문서 작성 규칙](docs/development/documentation.md). 수정 후 확인 목록으로 점검한다 |
 
 ## 작업 경계와 확인
 

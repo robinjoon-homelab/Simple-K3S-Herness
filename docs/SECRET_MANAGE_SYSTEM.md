@@ -1,7 +1,5 @@
 # Secret Manage System: 외부 API와 배포·저장 계약
 
-상태: 구현·배포 완료된 SMS의 외부 계약. 운영 기준일: 2026-09-11.
-
 이 문서는 하네스가 시크릿 관리 앱(Secret Manage System, SMS)을 배포하고 공통 Action이 호출하는 데 필요한 **외부 계약**과 운영자의 직접 관리 경로를 정한다. C4의 시스템 경계를 참고해 SMS를 하나의 서비스로 다루며 내부 컴포넌트까지 펼치지 않는다. 시스템 간 관계는 [전체 설계](../SYSTEM_DESIGN.md), 호출 방법은 [공통 GitHub Action](GITHUB_ACTION.md)을 참고한다.
 
 CI 조회 API·배포 입력·운영자 직접 관리 경로가 유지된다면 SMS의 테이블, 인증 라이브러리, UI 내부 구현을 바꿔도 이 문서를 수정할 필요가 없어야 한다. 내부 설계와 구현 시험은 SMS 구현 저장소가 소유한다.
@@ -92,7 +90,7 @@ SMS는 GitHub가 발급한 OIDC JWT의 서명, 발급자, audience, 유효시간
 
 실행 신원에는 `repository_id`, `repository_owner_id`, `ref`, `event_name`, `workflow_ref`가 필요하다. 아래 진입 정책에 등록된 레포 항목 하나에서 두 ID가 모두 일치하고, ref·event·workflow가 각각 해당 허용 목록의 값 중 하나와 일치해야 한다. 정책은 운영자가 SMS의 직접 관리 경로에서 등록·변경하는 비밀이 아닌 설정이다. 하네스 배포 매니페스트에는 포함하지 않으며, 저장·검증과 정책 적용은 SMS의 책임이다. 필요한 발급자 정보를 확보할 수 없어 신원을 검증하지 못하면 503 `IDENTITY_PROVIDER_UNAVAILABLE`로 실패하며 인증을 생략하지 않는다.
 
-노션 블로그의 진입 정책 예시는 다음과 같다. 소유자 ID와 워크플로 경로는 2026-09-12의 Organization 이전 기준이다. 저장소 ID와 기존 master·이벤트 제한은 유지한다.
+노션 블로그의 진입 정책 예시는 다음과 같다. 정책을 등록하는 방법은 [CI 자격증명 연동 절차](runbooks/load-ci-secrets.md#sms-허용-정책-등록)에 있다.
 
 ```yaml
 repositories:
@@ -125,7 +123,7 @@ SMS의 DB 접속 입력은 다음과 같다. 이는 하네스가 실제로 주�
 | `SPRING_DATASOURCE_USERNAME` | 같은 Secret에서 `username` 참조 |
 | `SPRING_DATASOURCE_PASSWORD` | 같은 Secret에서 `password` 참조 |
 
-환경변수 확장을 위해 `DB_PORT`는 접속 URL보다 먼저 선언한다. 기존 Secret의 `dbname`·URI를 그대로 쓰거나 전체를 `envFrom`으로 가져오지 않는다. Secret 복제와 공통 DB 접속 규칙은 [하네스 운영 문서](../README.md)를 따른다. 실제 자격증명은 Git이나 이미지에 넣지 않는다.
+환경변수 확장을 위해 `DB_PORT`는 접속 URL보다 먼저 선언한다. 기존 Secret의 `dbname`·URI를 그대로 쓰거나 전체를 `envFrom`으로 가져오지 않는다. Secret 복제는 [초기 연동 절차](runbooks/bootstrap.md#reflector-복제-범위-제한)를, 공통 DB 접속 규칙은 [워크로드 계약](WORKLOAD_PLATFORM.md#3-데이터베이스-모델)을 따른다. 실제 자격증명은 Git이나 이미지에 넣지 않는다.
 
 CI 조회 API는 `https://secrets.homelab.robinjoon.xyz`에 배포되어 있으며 공통 Action도 이 주소를 사용한다. 하네스는 HTTPS 경로와 호출 job에서의 도달 가능성을 준비한다. 운영자 UI·관리 API도 HTTPS로 접근하며, SMS가 정한 운영자 인증에 필요한 배포 설정만 하네스에 전달한다. 네트워크 접근 수단은 호출자 인증과 별도로 구성한다.
 
@@ -145,7 +143,7 @@ CI 자격증명은 **앱 수준에서 암호화하지 않고 평문으로 보관
 
 ## 5. 외부 계약 검증
 
-아래는 SMS의 외부 계약 검증 기준이다. 2026-09-10 배포 점검에서는 더미 객체 등록·조회·교체·삭제, 입력 검증, CSRF, 비인증 요청 거부와 상태 확인을 검증했다. 2026-09-11 [노션 블로그 CI](https://github.com/robinjoon-homelab/Notion-Blog/actions/runs/34603784590)에서는 실제 OIDC로 `zot`·`harness` 조회에 성공했다. 모든 장애·실행 출처 조합을 운영 환경에서 재현한 것은 아니다. 내부 테이블·라이브러리·관리 도구의 구조를 검사하지 않고 호출자가 관찰하는 결과를 확인한다.
+아래는 SMS의 외부 계약 검증 기준이다. 내부 테이블·라이브러리·관리 도구의 구조를 검사하지 않고 호출자가 관찰하는 결과를 확인한다. 지난 확인 결과는 [검증 기록](records/ci-secrets.md)에 있다.
 
 | 조건 | 관찰할 결과 |
 | --- | --- |

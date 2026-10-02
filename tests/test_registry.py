@@ -18,7 +18,8 @@ NETWORK_POLICY_APPLICATION = (
 NETWORK_POLICY = (
     REPOSITORY_ROOT / "infrastructure" / "registry" / "network-policy.yaml"
 )
-README = REPOSITORY_ROOT / "README.md"
+REGISTRY_RUNBOOK = REPOSITORY_ROOT / "docs" / "runbooks" / "registry.md"
+BOOTSTRAP_RUNBOOK = REPOSITORY_ROOT / "docs" / "runbooks" / "bootstrap.md"
 GITIGNORE = REPOSITORY_ROOT / ".gitignore"
 WORKLOAD_NAMESPACE_SELECTOR = "simple-k3s-harness.dev/workload=true"
 
@@ -220,9 +221,13 @@ class RegistryNetworkPolicyTest(unittest.TestCase):
 class RegistryReadmeBootstrapTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.readme = README.read_text()
+        # 레지스트리 계정·이미지 예제는 레지스트리 운영 절차가, Reflector 설정은 초기 연동 절차가 원본이다.
+        cls.registry = REGISTRY_RUNBOOK.read_text()
+        cls.bootstrap = BOOTSTRAP_RUNBOOK.read_text()
+        cls.readme = cls.registry + "\n" + cls.bootstrap
         cls.gitignore = GITIGNORE.read_text()
-        cls.code_blocks = fenced_code_blocks(cls.readme)
+        cls.code_blocks = fenced_code_blocks(cls.registry)
+        cls.bootstrap_blocks = fenced_code_blocks(cls.bootstrap)
 
     def assert_uses_workload_selector(self, block: str):
         for annotation in (
@@ -313,11 +318,11 @@ class RegistryReadmeBootstrapTest(unittest.TestCase):
 
     def test_registry_and_database_secrets_use_the_workload_selector(self):
         registry_block = code_block_containing(
-            self.code_blocks,
+            self.bootstrap_blocks,
             "annotate secret registry-credentials",
         )
         database_block = code_block_containing(
-            self.code_blocks,
+            self.bootstrap_blocks,
             "annotate secret shared-db-app",
         )
 

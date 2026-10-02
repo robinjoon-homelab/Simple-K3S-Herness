@@ -1,19 +1,12 @@
-# 홈 네트워크 VPN — Tailscale
+# 홈 LAN VPN 운영 절차
 
-상태: OAuth 등록·GitOps 배포·경로 승인·재시작 후 복구 및 외부 휴대폰의 홈 LAN 접속 확인 완료. 검증 기준일: 2026-09-18.
-
-2026-09-18 사전 검증: 기존 테스트와 인증 등록 도구 테스트 총 41개, 기존 앱 `validate --all`, 공식 Chart lint·렌더링, 공식 CRD 기반 Connector 스키마 검증, 실제 홈랩 API에서 Application·CRD server-side dry-run이 통과했다. 이 결과는 실제 VPN 접속 성공을 의미하지 않는다.
+Tailscale로 외부 기기에서 홈 LAN에 접속하도록 준비·배포·확인하는 절차다. 지난 확인 결과는 [검증 기록](../records/vpn.md)에 있다.
 
 ## 범위와 구조
 
 외부의 개인 노트북·휴대폰에서 홈 LAN `192.168.0.0/24` 전체에 접근한다. 홈랩 노드의 내부 IP는 `192.168.0.195`이며, 같은 LAN에 연결된 운영자 PC의 DHCP 서브넷 마스크 `255.255.255.0`으로 대역을 확인했고, 운영자가 이 대역만 연결 대상으로 확정했다. 추가 VLAN·다른 공유기 아래의 네트워크는 확인 후 별도 경로를 추가해야 한다.
 
-```text
-외부 기기(Tailscale 로그인)
-  → Tailscale 터널
-  → k3s 안의 homelab-lan 서브넷 라우터
-  → 홈 LAN 192.168.0.0/24 (홈 서버·NAS·기타 장치)
-```
+외부 기기는 Tailscale에 로그인한 뒤 터널을 거쳐 k3s 안의 `homelab-lan` 서브넷 라우터에 닿고, 라우터가 홈 LAN `192.168.0.0/24`(홈 서버, NAS, 기타 장치)로 연결한다.
 
 Tailscale 계정·관리 서비스(tailnet)를 이용한다. 하네스는 공식 Operator Helm Chart와 Connector를 `default` Argo CD Project의 별도 인프라 Application으로 배포한다. Operator와 프록시의 인증·상태는 Kubernetes Secrets에 보관하며, 공유 PostgreSQL이나 PVC는 필요하지 않다. 일반 앱용 CLI·공통 Chart·앱 소스 CI는 변경하지 않는다.
 
@@ -59,10 +52,9 @@ Tailscale 계정·관리 서비스(tailnet)를 이용한다. 하네스는 공식
 
 ## 2. OAuth 자격증명 등록
 
-홈랩에 접근할 수 있는 운영자 PC의 일반 터미널에서 실행한다. Python 3와 kubectl만 필요하다.
+홈랩에 접근할 수 있는 운영자 PC의 일반 터미널에서, 저장소 루트로 이동해 실행한다. Python 3와 kubectl만 필요하다.
 
 ```bash
-cd /Users/imsubin/IdeaProjects/Simple-K3S-Herness
 python3 tools/register_tailscale_oauth.py --context homelab
 ```
 
@@ -80,9 +72,9 @@ kubectl --context homelab -n tailscale get secret operator-oauth -o name
 
 배포 파일:
 
-- [Operator Application](../argocd/managed/apps/tailscale-operator.yaml): 공식 Chart `1.102.4`, 기존 `operator-oauth` 참조, CRD·RBAC·Operator 설치.
-- [Router Application](../argocd/managed/apps/tailscale-router.yaml): Connector 배포.
-- [Connector](../infrastructure/tailscale/connector.yaml): 단일 `homelab-lan` 라우터와 홈 LAN 경로.
+- [Operator Application](../../argocd/managed/apps/tailscale-operator.yaml): 공식 Chart `1.102.4`, 기존 `operator-oauth` 참조, CRD·RBAC·Operator 설치.
+- [Router Application](../../argocd/managed/apps/tailscale-router.yaml): Connector 배포.
+- [Connector](../../infrastructure/tailscale/connector.yaml): 단일 `homelab-lan` 라우터와 홈 LAN 경로.
 
 자격증명 등록 후 검증된 구성을 원격 `main`에 반영하면 기존 Root Application이 두 Application을 발견한다. Root는 원격 Git을 읽으며 로컬 파일·커밋만으로 배포되지 않는다. 직접 `helm install`이나 `kubectl apply -f connector.yaml`로 우회하지 않는다.
 
@@ -108,18 +100,6 @@ kubectl --context homelab -n tailscale rollout status deployment/operator --time
 외부 Wi-Fi도 `192.168.0.0/24`이면 주소 충돌이 생길 수 있다. 우선 셀룰러에서 시험하고, 반복되는 충돌은 홈 LAN 대역 변경이나 Tailscale 4via6 같은 별도 설계로 해결한다. 수동 공유기 포트 포워딩 없이 연결을 시도하며, 직접 연결이 어려우면 Tailscale 릴레이를 사용한다. 외부 연결을 제한하는 방화벽에서는 공식 문서의 outbound 요구사항을 확인한다.
 
 기존 `*.homelab.robinjoon.xyz` 이름을 내부 IP로 사용하려면 split DNS와 해당 DNS 서버의 VPN 접근을 별도로 구성한다. 이번 기본 구성은 IP 기반 홈 LAN 접근이며, 기존 DNS·공개 Ingress·앱 인증 설정은 유지한다.
-
-## 배포 검증 기록
-
-2026-09-18 홈랩에서 확인한 결과:
-
-- `tailscale-operator`와 `tailscale-router`: Argo CD `Synced / Healthy`, 동기화 성공.
-- Operator와 서브넷 라우터 Pod: `1/1 Running`.
-- Tailscale: `Running`, 온라인, `192.168.0.0/24`가 승인된 기본 경로로 표시됨.
-- 라우터 Pod 재시작: rollout 성공, 기존 Tailscale 주소와 승인 경로 유지.
-- VPN Pod → 홈 서버 `192.168.0.195:6443`, 공유기 `192.168.0.1:80`: TCP 연결 성공.
-- 기존 Application: 모두 `Synced / Healthy` 유지.
-- 외부 휴대폰 → 홈 LAN: 운영자가 집 Wi-Fi를 끈 셀룰러 + Tailscale 상태에서 `http://192.168.0.1` 공유기 화면이 열리는 것을 확인했다. 모든 LAN 장치의 개별 서비스까지 시험한 것은 아니다.
 
 ## 공식 참고 문서
 

@@ -55,7 +55,7 @@ Chart는 각 Ingress 선언에 대해 `websecure` entrypoint의 TLS Ingress 하�
 
 HTTP→HTTPS와 HSTS는 `default` Project의 `traefik-policy` Application이 관리하는 공통 인프라 정책이다. `infrastructure/traefik/resources.yaml`은 `kube-system/platform-https-headers` Middleware와 `kube-system/traefik` HelmChartConfig를 선언한다. HelmChartConfig는 `ports.web.http.redirections.entryPoint`로 `websecure`의 외부 443 포트에 영구 리다이렉트하고, `ports.websecure.http`에서 TLS와 공용 HSTS Middleware를 적용한다. HSTS는 `max-age=31536000`이며 `includeSubDomains`·`preload`는 사용하지 않는다. 이 정책은 일반 앱·Argo CD·레지스트리를 포함한 Traefik 웹 접속에 공통으로 적용한다. cert-manager는 기존 인증서 발급·갱신을 계속 담당한다.
 
-배포 전 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·CRD provider, `traefik.io`의 `Middleware` CRD와 k3s Helm Controller가 준비되어 있어야 한다. cert-manager와 플랫폼에서 지정한 ClusterIssuer도 필요하다. 공용 정책의 Application 동기화 이후 Helm Controller가 실제 Traefik 설정을 갱신하고 자동 rollout을 완료했는지 확인한다. Argo CD 서버 설정과 기존 리소스 관리 주체는 바뀌지 않고 서버 재시작도 필요하지 않다. 로컬 `validate`·`render` 성공은 정책 적용이나 실제 접속 검증을 대신하지 않는다. 적용 확인은 [README](../README.md#공용-traefik-https-정책)를 따른다.
+배포 전 Traefik의 `web`·`websecure` entrypoint, Kubernetes Ingress·CRD provider, `traefik.io`의 `Middleware` CRD와 k3s Helm Controller가 준비되어 있어야 한다. cert-manager와 플랫폼에서 지정한 ClusterIssuer도 필요하다. 공용 정책의 Application 동기화 이후 Helm Controller가 실제 Traefik 설정을 갱신하고 자동 rollout을 완료했는지 확인한다. Argo CD 서버 설정과 기존 리소스 관리 주체는 바뀌지 않고 서버 재시작도 필요하지 않다. 로컬 `validate`·`render` 성공은 정책 적용이나 실제 접속 검증을 대신하지 않는다. 적용 확인은 [공용 Traefik HTTPS 정책 적용과 확인](runbooks/traefik-https.md)을 따른다.
 
 ## 3. 데이터베이스 모델
 
@@ -77,7 +77,7 @@ zot에 내장된 htpasswd 인증과 저장소 ACL을 사용하고 익명 접근�
 
 이 구성은 홈랩용 단일 인스턴스이므로 고가용성을 제공하지 않는다. zot 또는 해당 노드가 중단되면 새 Pod의 이미지 pull과 신규 배포가 실패할 수 있지만, 이미 실행 중인 Pod는 이미지를 다시 요청하지 않는 한 계속 동작한다. `local-path` 볼륨의 스냅샷과 외부 백업, 복구 검증은 이 저장소 밖의 운영 책임이며, 노드나 디스크를 잃으면 백업이 없는 이미지는 복구할 수 없다.
 
-`registry.homelab.robinjoon.xyz`가 Traefik 진입점을 가리키도록 하는 DNS 레코드는 외부 접근의 선행 조건이지만 이 저장소에서 생성하지 않는다. Tailscale Operator와 홈 LAN 서브넷 라우터는 `default` Project의 별도 인프라 Application으로 선언한다. 공식 전용 Chart와 Connector를 사용하며 일반 워크로드 계약의 지원 범위를 확장하지 않는다. 계정·tailnet 접근 정책·경로 승인은 외부 Tailscale 관리 영역에 남고, OAuth 자격증명은 Git 밖의 Kubernetes Secret으로 등록한다. VPN은 zot 인증과 ACL을 대체하지 않으며 TLS와 zot 접근 제어는 유지한다. 설치 상태와 절차는 [VPN 운영 문서](VPN.md)를 따른다.
+`registry.homelab.robinjoon.xyz`가 Traefik 진입점을 가리키도록 하는 DNS 레코드는 외부 접근의 선행 조건이지만 이 저장소에서 생성하지 않는다. Tailscale Operator와 홈 LAN 서브넷 라우터는 `default` Project의 별도 인프라 Application으로 선언한다. 공식 전용 Chart와 Connector를 사용하며 일반 워크로드 계약의 지원 범위를 확장하지 않는다. 계정·tailnet 접근 정책·경로 승인은 외부 Tailscale 관리 영역에 남고, OAuth 자격증명은 Git 밖의 Kubernetes Secret으로 등록한다. VPN은 zot 인증과 ACL을 대체하지 않으며 TLS와 zot 접근 제어는 유지한다. 설치 절차는 [VPN 운영 절차](runbooks/vpn.md)를 따른다.
 
 ## 5. 변경 인터페이스 계약
 
@@ -118,3 +118,5 @@ AI 에이전트는 구성 변경에 `release.py`를 사용하지 않고, 앱 CI�
 워크로드 Project는 Namespace 생성과 공통 Chart가 직접 만드는 Deployment, Service, ConfigMap, Ingress, cert-manager Certificate, CNPG Database를 허용한다. Argo CD 리소스 트리에서 컨트롤러가 만든 하위 리소스를 확인할 수 있도록 ReplicaSet, Pod, Secret, CertificateRequest, Order, Challenge도 허용한다. 이 하위 리소스들은 JSON Contract가 직접 생성하지 않는다. 기존 앱별 Traefik Middleware의 조회·정리를 위해 해당 허용 항목은 유지하지만 공통 Chart가 새 Middleware를 생성하지는 않는다.
 
 공유 CNPG Cluster, zot 레지스트리, Tailscale Operator·Connector, 공용 Traefik HTTPS 정책 같은 인프라 리소스는 `default` Project의 인프라 Application과 Root Application이 관리하며, 워크로드 Project에는 이 리소스의 생성 권한을 주지 않는다. `platform/defaults.json`은 모든 앱 values보다 먼저 병합되고 워크로드 계약에서는 덮어쓸 수 없다.
+
+CLI가 만드는 앱 Application은 자동 동기화에 prune과 self-heal을 켠다. 공용 Traefik 정책의 `traefik-policy` Application은 자동 동기화와 self-heal을 쓰되 prune은 끈다.

@@ -1,7 +1,5 @@
 # 홈랩 하네스 전체 설계
 
-상태: SMS 배포·공통 Action `v1.0.0` 게시·노션 블로그 CI 전환과 `robinjoon-homelab` Organization 이전 완료. 운영 기준일: 2026-09-12.
-
 전체 앱과 배포·운영 서비스의 대표 관계도는 [단일 draw.io 다이어그램](docs/diagrams/README.md)이다. 개인용 앱들은 동등한 배포 대상이며 특정 앱이 중심이 아니다. 그림은 이 관계도 하나로 관리하고, 이 문서는 관계도에 나타난 요소의 책임·흐름·운영 전제를 글과 표로 설명한다. 새 에이전트는 [공통 시작 지침](AGENTS.md)에서 시스템 요약과 작업별 읽기 경로를 먼저 확인한다.
 
 ## 문서의 수준과 검토 기준
@@ -74,7 +72,7 @@ C4의 수준은 문서의 관심사를 정하는 기준으로 사용한다. HTTP
 | zot | 같은 공통 계정으로 이미지 발행과 pull을 지원한다. 계정 자체의 권한은 기존과 같다. |
 | 앱 실행 프로세스·기존 Secrets | 기존 앱의 런타임 설정을 유지하고, `shared-db-app` 접속 정보는 기존 계약으로 SMS에도 주입한다. CI에서 받은 값은 앱 Pod에 자동 주입하지 않는다. |
 
-소스 저장소는 `robinjoon-homelab`에서 관리한다. 하네스는 공통 배포 도구와 Action을, 별도 비공개 `Secret-Manager-System` 저장소는 SMS 구현을, 각 앱 저장소는 앱 코드와 CI를 소유한다. SMS의 CI 자격증명과 OIDC 허용 정책은 PostgreSQL에 저장하며 운영자가 SMS에서 직접 관리한다. OIDC 정책은 하네스의 워크로드 values에 넣지 않는다.
+소스 저장소는 `robinjoon-homelab`에서 관리한다. 하네스와 Notion-Blog는 공개, SMS는 비공개 저장소다. 하네스는 공통 배포 도구와 Action을, 별도 비공개 `Secret-Manager-System` 저장소는 SMS 구현을, 각 앱 저장소는 앱 코드와 CI를 소유한다. SMS의 CI 자격증명과 OIDC 허용 정책은 PostgreSQL에 저장하며 운영자가 SMS에서 직접 관리한다. OIDC 정책은 하네스의 워크로드 values에 넣지 않는다.
 
 ## 주요 흐름과 책임 경계
 
@@ -100,24 +98,14 @@ C4의 수준은 문서의 관심사를 정하는 기준으로 사용한다. HTTP
 
 하네스 Git → Argo CD 연결에는 공용 Traefik의 HTTPS 정책도 포함한다. `traefik-policy` Application이 `infrastructure/traefik/resources.yaml`의 HelmChartConfig와 HSTS Middleware를 자동 동기화한다. k3s Helm Controller는 이 설정으로 Traefik을 갱신하고, Traefik은 일반 앱·Argo CD·레지스트리에 HTTP→HTTPS 443 전환과 HTTPS 응답의 HSTS를 공통 적용한다. 시스템 관계도의 서비스나 연결선을 늘리지 않는다.
 
-cert-manager는 기존 인증서 발급·갱신을 담당한다. 일반 앱 Chart는 HTTPS Ingress와 Certificate를 선언하고 앱별 HTTP Ingress·Middleware는 만들지 않는다. Argo CD 자신의 Ingress·서버 설정과 관리 주체는 유지하며 서버 재시작도 필요하지 않다. 정책 적용에는 Traefik의 자동 rollout이 따르고 일시적인 접속 영향이 있을 수 있다. Application 동기화와 Helm Controller의 적용·rollout 완료는 별도로 확인한다. 배포 확인 절차와 실제 검증 기록은 [정책과 적용 확인](README.md#공용-traefik-https-정책)을 따른다.
+cert-manager는 기존 인증서 발급·갱신을 담당한다. 일반 앱 Chart는 HTTPS Ingress와 Certificate를 선언하고 앱별 HTTP Ingress·Middleware는 만들지 않는다. Argo CD 자신의 Ingress·서버 설정과 관리 주체는 유지하며 서버 재시작도 필요하지 않다. 정책 적용에는 Traefik의 자동 rollout이 따르고 일시적인 접속 영향이 있을 수 있다. Application 동기화와 Helm Controller의 적용·rollout 완료는 별도로 확인한다. 배포 확인 절차와 실제 검증 기록은 [정책 적용과 확인](docs/runbooks/traefik-https.md)을 따른다.
 
 ## 홈 LAN 접근용 VPN
 
 Tailscale Operator와 Connector는 하네스의 인프라 Application으로 관리한다. 외부 개인 기기에서 k3s 안의 단일 서브넷 라우터를 거쳐 `192.168.0.0/24` 전체로 접근한다. 계정과 tailnet 접근 정책·경로 승인은 Tailscale 관리 서비스가 소유하며, Operator OAuth 자격증명은 Git 밖의 Kubernetes Secret에 등록한다. SMS나 공유 DB를 사용하지 않는다.
 
-VPN은 장애 복구용이 아니며 k3s 중단 시 함께 중단된다. 일반 앱의 CLI·공통 Chart·CI 계약은 유지한다. 배포 선언 준비와 실제 접속 검증 상태는 [VPN 운영 절차](docs/VPN.md)에서 구분한다. VPN의 내부 구현은 이 문서에서 펼치지 않으며, 전체 관계는 [대표 관계도](docs/diagrams/README.md)에 반영한다.
+VPN은 장애 복구용이 아니며 k3s 중단 시 함께 중단된다. 일반 앱의 CLI·공통 Chart·CI 계약은 유지한다. 배포 선언 준비와 실제 접속 검증 상태는 [VPN 운영 절차](docs/runbooks/vpn.md)에서 구분한다. VPN의 내부 구현은 이 문서에서 펼치지 않으며, 전체 관계는 [대표 관계도](docs/diagrams/README.md)에 반영한다.
 
-## 검토와 이후 동작 확인의 구분
+## 검증 기록
 
-설계 문서는 O1~O5와 각 상세 문서의 기준으로 독립 리뷰하고, JSON·YAML·링크 및 상호 계약을 확인한다. 공통 Action은 더미 값을 사용하는 로컬 계약 시험과 독립 번들 실행을 검증했다. 2026-09-11에는 [노션 블로그 CI](https://github.com/robinjoon-homelab/Notion-Blog/actions/runs/34603784590)에서 실제 OIDC 조회·이미지 발행·하네스 호출이 성공했다. [하네스 릴리스](https://github.com/robinjoon-homelab/Simple-K3S-Herness/actions/runs/34604228764)가 해당 이미지 태그를 Git에 반영했다.
-
-구현 이후 전체 연결을 확인할 때는 다음 순서로 진행한다. 각 컴포넌트의 세부 시험은 해당 문서가 정의한다.
-
-| 단계 | 준비 | 확인할 행동과 통과 조건 | 실제 운영에 미치는 영향 |
-| --- | --- | --- | --- |
-| 더미 값으로 연결 확인 | 공유 PostgreSQL에 SMS 논리 DB 준비, 시크릿 관리 앱 배포, 테스트 CI 값 입력, Action 원격 반영, 허용된 테스트 job | 실제 GitHub 실행에서 조회한 테스트 값이 같은 job의 다음 step에 정확히 전달된다. 로그에는 값이 드러나지 않는다. | 실제 자격증명·이미지·배포는 변경하지 않는다. |
-| 기존 CI와 연결 | 위 단계 통과 후 실제 CI 값 입력, 앱 publish job의 조회 방식 변경 | 받은 자격증명으로 이미지 push와 기존 하네스 릴리스 요청이 성공한다. | 실제 CI 전환 단계다. 기존 GitHub Secrets는 남겨두어 되돌릴 수 있게 한다. |
-| 기존 배포 흐름 확인 | 릴리스 요청이 성공한 상태 | 하네스의 이미지 태그 변경, Argo CD 동기화, 대상 앱의 준비 상태를 각각 확인한다. | 배포 확인이며 시크릿 조회 성공과 구분한다. |
-
-SMS 배포와 공통 Action `v1.0.0` 게시, 노션 블로그 CI 전환이 완료됐다. 노션 블로그는 실제 이미지 발행과 클러스터 배포·readiness를 확인한 뒤 대체된 CI용 GitHub Secrets를 정리했다. 다른 앱도 같은 순서로 전환하며 앱 실행용 Kubernetes Secret은 별도로 유지한다.
+설계 검토 이후의 실제 연동·배포 확인 결과는 [문서 색인의 검증 기록](docs/README.md#검증-기록)에 주제별로 있다. CI 자격증명 전환 순서는 [CI 자격증명 연동 절차](docs/runbooks/load-ci-secrets.md#기존-ci를-sms로-옮기는-순서)를 따른다.
