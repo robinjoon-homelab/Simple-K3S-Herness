@@ -2,11 +2,11 @@
 
 상태: SMS 배포·공통 Action `v1.0.0` 게시·노션 블로그 CI 전환과 `robinjoon-homelab` Organization 이전 완료. 운영 기준일: 2026-09-12.
 
-전체 앱과 배포·운영 서비스의 대표 관계도는 [단일 draw.io 다이어그램](docs/diagrams/README.md)이다. 개인용 앱들은 동등한 배포 대상이며 특정 앱이 중심이 아니다. 아래 Mermaid는 그중 CI 자격증명 전달과 하네스의 책임 경계를 자세히 설명한다. 새 에이전트는 [공통 시작 지침](AGENTS.md)에서 시스템 요약과 작업별 읽기 경로를 먼저 확인한다.
+전체 앱과 배포·운영 서비스의 대표 관계도는 [단일 draw.io 다이어그램](docs/diagrams/README.md)이다. 개인용 앱들은 동등한 배포 대상이며 특정 앱이 중심이 아니다. 그림은 이 관계도 하나로 관리하고, 이 문서는 관계도에 나타난 요소의 책임·흐름·운영 전제를 글과 표로 설명한다. 새 에이전트는 [공통 시작 지침](AGENTS.md)에서 시스템 요약과 작업별 읽기 경로를 먼저 확인한다.
 
 ## 문서의 수준과 검토 기준
 
-이 문서는 C4의 **시스템 관계(L1)와 컨테이너(L2)** 수준에서 각 요소의 책임과 연결을 설명한다. 두 수준은 별도 다이어그램으로 구분한다. C4의 컨테이너는 실행 프로그램이나 데이터 저장소를 뜻하며 Docker 컨테이너와 같은 뜻이 아니다. 공통 Action은 CI job 안에서 실행되는 코드이므로 독립 서버로 그리지 않는다.
+이 문서는 C4의 **시스템 관계(L1)와 컨테이너(L2)** 수준에서 각 요소의 책임과 연결을 설명한다. 두 수준은 절을 나누어 설명하며 별도 그림을 두지 않는다. C4의 컨테이너는 실행 프로그램이나 데이터 저장소를 뜻하며 Docker 컨테이너와 같은 뜻이 아니다. 공통 Action은 CI job 안에서 실행되는 코드이므로 독립 서버로 그리지 않는다.
 
 | 문서 | 대상 독자와 추상화 수준 | 포함하는 내용 | 포함하지 않는 내용 |
 | --- | --- | --- | --- |
@@ -19,8 +19,8 @@ C4의 수준은 문서의 관심사를 정하는 기준으로 사용한다. HTTP
 
 작성 전 정한 전체 설계 검토 기준:
 
-- **O1 — 수준:** L1에는 사람·시스템, L2에는 실행 단위·저장소와 직접 연결된 사람·외부 시스템만 표시한다.
-- **O2 — 관계:** 각 화살표는 누가 무엇을 주거나 요청하는지 설명한다. Action은 호출 앱의 CI job 안에 있고, GitHub가 실행 신원을 발급한다.
+- **O1 — 수준:** L1은 사람·시스템, L2는 실행 단위·저장소와 직접 연결된 사람·외부 시스템만 다룬다.
+- **O2 — 관계:** 각 관계는 누가 무엇을 주거나 요청하는지 설명한다. Action은 호출 앱의 CI job 안에 있고, GitHub가 실행 신원을 발급한다.
 - **O3 — 경계:** 운영자는 SMS에서 CI 값을 직접 관리하고 하네스는 관리 API를 호출하지 않는다. CI 자격증명 전달과 배포된 앱의 실행 설정을 구분하며, SMS에서 앱의 Kubernetes Secret으로 이어지는 쓰기 경로는 없다.
 - **O4 — 단순화:** 앱 간 격리 최소화, 공통 자격증명 공유, GitHub-hosted runner 사용을 유지한다. 앱별 ACL이나 셀프 호스팅 러너를 추가하지 않는다.
 - **O5 — 일관성:** 상세 계약은 두 하위 문서가 소유한다. 현재 구성·향후 제안·검증 완료 여부를 구분하고 깨진 링크나 서로 다른 계약을 남기지 않는다.
@@ -38,99 +38,28 @@ C4의 수준은 문서의 관심사를 정하는 기준으로 사용한다. HTTP
 
 ## L1 — 시스템 관계
 
-아래는 전체 관계를 보여주는 시스템 랜드스케이프다. 사람과 소프트웨어 시스템만 표시하며 내부 파일·프로세스와 논리 DB 구분은 다음 수준에서 설명한다. SMS와 공통 Action도 현재 운영 중인 배포 경로에 포함된다.
+사람과 소프트웨어 시스템 사이의 관계다. 내부 파일·프로세스와 논리 DB 구분은 다음 수준에서 설명한다. SMS와 공통 Action도 현재 운영 중인 배포 경로에 포함된다. 그림은 [대표 관계도](docs/diagrams/README.md)를 본다.
 
-```mermaid
-flowchart LR
-    operator["운영자<br/>Person"]
-    agent["앱 개발 에이전트<br/>Person 대리"]
-    github["GitHub<br/>소스 관리 · Actions · 실행 신원 발급"]
-    harness["배포 하네스<br/>설정 변경 · 릴리스 요청 · GitOps 동기화"]
-    sms["Secret Manage System<br/>CI 자격증명 보관·관리·조회"]
-    registry["zot<br/>배포 이미지 보관"]
-    database["공유 PostgreSQL<br/>공통 데이터 저장"]
-    apps["각 앱<br/>노션 블로그 등 실행 중인 서비스"]
-
-    operator -->|"배포 설정 변경"| harness
-    agent -->|"배포 요청 API로 워크로드 조회·생성·수정"| harness
-    operator -->|"직접 웹 UI에 접속해 CI 자격증명 관리"| sms
-    harness -->|"선언된 SMS 구성 동기화"| sms
-    github -->|"실행 신원을 제시하고 CI 값 요청"| sms
-    sms -->|"요청한 CI 자격증명 반환"| github
-    sms -->|"실행 신원 검증에 필요한 정보 조회"| github
-    github -->|"빌드한 이미지 발행"| registry
-    github -->|"새 이미지의 배포 요청"| harness
-    harness -->|"선언된 앱 구성 동기화"| apps
-    registry -->|"배포 이미지 제공"| apps
-    registry -->|"SMS 이미지 제공"| sms
-    sms -->|"CI 자격증명 저장·조회"| database
-    apps -->|"앱 실행 데이터 저장·조회"| database
-```
+| 주체 | 대상 | 관계 |
+| --- | --- | --- |
+| 운영자 | 배포 하네스 | 배포 설정 변경 |
+| 앱 개발 에이전트 | 배포 하네스 | 배포 요청 API로 워크로드 조회·생성·수정 |
+| 운영자 | Secret Manage System | 직접 웹 UI에 접속해 CI 자격증명 관리 |
+| 배포 하네스 | Secret Manage System | 선언된 SMS 구성 동기화 |
+| GitHub | Secret Manage System | 실행 신원을 제시하고 CI 값 요청 |
+| Secret Manage System | GitHub | 요청한 CI 자격증명 반환 |
+| Secret Manage System | GitHub | 실행 신원 검증에 필요한 정보 조회 |
+| GitHub | zot | 빌드한 이미지 발행 |
+| GitHub | 배포 하네스 | 새 이미지의 배포 요청 |
+| 배포 하네스 | 각 앱 | 선언된 앱 구성 동기화 |
+| zot | 각 앱 | 배포 이미지 제공 |
+| zot | Secret Manage System | SMS 이미지 제공 |
+| Secret Manage System | 공유 PostgreSQL | CI 자격증명 저장·조회 |
+| 각 앱 | 공유 PostgreSQL | 앱 실행 데이터 저장·조회 |
 
 ## L2 — 컨테이너 수준 시스템 랜드스케이프
 
-아래는 같은 기능을 실행 프로그램과 저장소로 확대한 논리 구조다. 경계는 관리 책임을 나타내며 물리 노드·Pod 개수·Ingress 규칙을 표현하는 배포도는 아니다. 공통 Action은 앱 CI job의 일부이며, SMS의 구현 저장소와 하네스의 배포 선언은 별도로 관리한다.
-
-```mermaid
-flowchart TB
-    operator["운영자<br/>Person"]
-    agent["앱 개발 에이전트<br/>Person 대리"]
-    oidc["GitHub OIDC<br/>외부 시스템: 실행 신원 발급"]
-
-    subgraph appDelivery["각 앱의 빌드·배포"]
-        appRepo[("앱 Git 저장소<br/>앱 소스와 CI 워크플로")]
-        appCI["앱 CI job<br/>GitHub-hosted runner<br/>공통 Action 실행"]
-    end
-
-    subgraph harnessBoundary["배포 하네스"]
-        harnessGit[("하네스 Git 저장소<br/>배포 계약 · 공통 Chart · Action 코드")]
-        configCLI["워크로드 구성 CLI<br/>Python / 로컬 실행"]
-        release["하네스 릴리스 job<br/>GitHub Actions / Python CLI"]
-        deployApi["배포 요청 API<br/>FastAPI / k3s"]
-        applyJob["워크로드 적용 job<br/>GitHub Actions / Python CLI"]
-        argo["Argo CD<br/>Git 배포 계약 동기화"]
-    end
-
-    subgraph smsBoundary["Secret Manage System"]
-        sms["SMS 웹 애플리케이션 · Kotlin / Spring<br/>템플릿 기반 운영자 UI · 관리 API · CI 조회 API"]
-    end
-
-    subgraph homelabBoundary["홈랩 공통 런타임"]
-        registry["zot<br/>OCI 이미지 저장 서비스"]
-        app["앱 실행 프로세스<br/>K3s Deployment"]
-        runtime[("기존 Kubernetes Secrets<br/>shared-db-app · 앱 실행 설정")]
-        subgraph sharedDatabase["공유 PostgreSQL Cluster"]
-            smsDB[("secret_manage_system<br/>CI 자격증명")]
-            appDBs[("앱별 논리 DB<br/>앱 실행 데이터")]
-        end
-    end
-
-    operator -->|"직접 또는 AI 에이전트로 구성 변경"| configCLI
-    configCLI -->|"배포 계약 작성 후 운영자가 Git 반영"| harnessGit
-    agent -->|"GitHub 토큰으로 HTTPS 요청"| deployApi
-    deployApi -->|"호출자 토큰으로 GitHub API 조회"| harnessGit
-    deployApi -->|"호출자 토큰으로 workflow_dispatch"| applyJob
-    applyJob -->|"CLI로 생성·수정 후 Git 반영"| harnessGit
-    operator -->|"운영자 인증 후 웹 UI에서 CI 값 관리"| sms
-    appRepo -->|"소스와 워크플로 제공"| appCI
-    harnessGit -->|"고정된 버전의 공통 Action 제공"| appCI
-    oidc -->|"호출 job의 서명된 신원 증명"| appCI
-    appCI -->|"HTTPS로 CI 값 조회와 신원 증명 전달"| sms
-    sms -->|"서명 검증용 공개 키 조회"| oidc
-    sms -->|"CI 자격증명 저장·조회"| smsDB
-    sms -->|"조회한 값을 같은 job에 반환"| appCI
-    appCI -->|"자격증명으로 이미지 push"| registry
-    appCI -->|"앱 · 컨테이너 · 새 이미지 태그"| release
-    release -->|"기존 이미지 태그 변경과 Git 반영"| harnessGit
-    harnessGit -->|"원격 배포 계약과 공통 Chart"| argo
-    argo -->|"선언된 Deployment 구성 적용"| app
-    argo -->|"SMS Deployment와 논리 DB 구성 적용"| sms
-    registry -->|"배포 Pod에 OCI 이미지 제공"| app
-    registry -->|"SMS Pod에 OCI 이미지 제공"| sms
-    runtime -->|"기존 참조에 따라 환경변수 주입"| app
-    runtime -->|"DB 접속 환경변수 주입"| sms
-    app -->|"공유 계정으로 앱 데이터 사용"| appDBs
-```
+같은 기능을 실행 프로그램과 저장소로 확대한 논리 구조다. 경계는 관리 책임을 나타내며 물리 노드·Pod 개수·Ingress 규칙을 표현하는 배포도는 아니다. 공통 Action은 앱 CI job의 일부이며, SMS의 구현 저장소와 하네스의 배포 선언은 별도로 관리한다. 요소 사이의 흐름은 다음 절에서 설명한다.
 
 | 요소 | 책임과 실행 범위 |
 | --- | --- |
@@ -154,6 +83,7 @@ flowchart TB
 3. 시크릿 관리 앱은 실행을 허용할지 판단한 뒤 요청한 앱 이름의 값을 반환한다. 공통 Action은 이를 같은 job의 후속 step에 전달한다.
 4. 앱 CI는 받은 값으로 zot에 이미지를 발행하고 기존 하네스 릴리스 워크플로를 호출한다. 하네스가 Git의 이미지 태그를 변경하면 Argo CD가 앱을 동기화한다.
 5. 배포된 앱은 기존 Kubernetes Secret 참조와 공유 DB 접속 방식을 계속 사용한다. CI에서 받은 값을 새 Kubernetes Secret으로 만들거나 앱 Pod에 자동 주입하지 않는다.
+6. 배포 계약의 생성·수정은 두 경로로 한다. 운영자나 하네스 안의 에이전트는 구성 CLI로 파일을 바꾸고 직접 Git에 반영한다. 앱 레포의 에이전트는 GitHub 토큰으로 배포 요청 API를 호출한다. API는 호출자 토큰으로 하네스 Git을 조회하고 워크로드 적용 workflow를 실행하며, 그 job 안의 CLI가 파일을 바꾸어 커밋한다. 이후 Argo CD가 4번과 같은 방식으로 동기화한다.
 
 공통 값은 값을 제공하는 시스템 이름으로 한 번 보관한다. 예를 들어 노션 블로그 CI는 레지스트리용 값과 하네스 호출용 값을 각각 조회한다. 이를 각 소비 앱 이름 아래에 반복 복사할 필요가 없다.
 
@@ -176,11 +106,11 @@ cert-manager는 기존 인증서 발급·갱신을 담당한다. 일반 앱 Char
 
 Tailscale Operator와 Connector는 하네스의 인프라 Application으로 관리한다. 외부 개인 기기에서 k3s 안의 단일 서브넷 라우터를 거쳐 `192.168.0.0/24` 전체로 접근한다. 계정과 tailnet 접근 정책·경로 승인은 Tailscale 관리 서비스가 소유하며, Operator OAuth 자격증명은 Git 밖의 Kubernetes Secret에 등록한다. SMS나 공유 DB를 사용하지 않는다.
 
-VPN은 장애 복구용이 아니며 k3s 중단 시 함께 중단된다. 일반 앱의 CLI·공통 Chart·CI 계약은 유지한다. 배포 선언 준비와 실제 접속 검증 상태는 [VPN 운영 절차](docs/VPN.md)에서 구분한다. 위 CI·SMS 중심 그림에는 VPN의 내부 구현을 추가하지 않으며, 전체 관계는 [대표 관계도](docs/diagrams/README.md)에 반영한다.
+VPN은 장애 복구용이 아니며 k3s 중단 시 함께 중단된다. 일반 앱의 CLI·공통 Chart·CI 계약은 유지한다. 배포 선언 준비와 실제 접속 검증 상태는 [VPN 운영 절차](docs/VPN.md)에서 구분한다. VPN의 내부 구현은 이 문서에서 펼치지 않으며, 전체 관계는 [대표 관계도](docs/diagrams/README.md)에 반영한다.
 
 ## 검토와 이후 동작 확인의 구분
 
-설계 문서는 O1~O5와 각 상세 문서의 기준으로 독립 리뷰하고, Mermaid·JSON·YAML·링크 및 상호 계약을 확인한다. 공통 Action은 더미 값을 사용하는 로컬 계약 시험과 독립 번들 실행을 검증했다. 2026-09-11에는 [노션 블로그 CI](https://github.com/robinjoon-homelab/Notion-Blog/actions/runs/34603784590)에서 실제 OIDC 조회·이미지 발행·하네스 호출이 성공했다. [하네스 릴리스](https://github.com/robinjoon-homelab/Simple-K3S-Herness/actions/runs/34604228764)가 해당 이미지 태그를 Git에 반영했다.
+설계 문서는 O1~O5와 각 상세 문서의 기준으로 독립 리뷰하고, JSON·YAML·링크 및 상호 계약을 확인한다. 공통 Action은 더미 값을 사용하는 로컬 계약 시험과 독립 번들 실행을 검증했다. 2026-09-11에는 [노션 블로그 CI](https://github.com/robinjoon-homelab/Notion-Blog/actions/runs/34603784590)에서 실제 OIDC 조회·이미지 발행·하네스 호출이 성공했다. [하네스 릴리스](https://github.com/robinjoon-homelab/Simple-K3S-Herness/actions/runs/34604228764)가 해당 이미지 태그를 Git에 반영했다.
 
 구현 이후 전체 연결을 확인할 때는 다음 순서로 진행한다. 각 컴포넌트의 세부 시험은 해당 문서가 정의한다.
 

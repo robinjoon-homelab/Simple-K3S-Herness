@@ -1949,6 +1949,7 @@ git commit -m "feat(server): add deploy API image and build workflow"
   - 작업별 문서 표에 행 추가: `| 배포 요청 API·앱 에이전트 연동 | [배포 요청 API](docs/DEPLOY_API.md) |`
 
 - [ ] **Step 3: `SYSTEM_DESIGN.md`**
+  > 2026-10-02 갱신: 운영자 결정으로 `SYSTEM_DESIGN.md`의 Mermaid 그림을 제거했다. 아래 L1·L2 Mermaid 수정 지시는 더 이상 적용하지 않는다. 같은 관계는 L1 관계 표와 "주요 흐름과 책임 경계" 6번 항목, 그리고 draw.io 대표 관계도가 담는다. 요소 표에 관한 지시만 유효하다.
   - L1 mermaid에 `agent["앱 개발 에이전트<br/>Person 대리"]`, 관계 `agent -->|"배포 요청 API로 워크로드 조회·생성·수정"| harness`를 추가한다.
   - L2 `harnessBoundary`에 `deployApi["배포 요청 API<br/>FastAPI / k3s"]`와 `applyJob["워크로드 적용 job<br/>GitHub Actions / Python CLI"]`, 바깥에 `agent["앱 개발 에이전트"]`를 추가하고 관계 네 개를 추가한다: `agent -->|"GitHub 토큰으로 HTTPS 요청"| deployApi`, `deployApi -->|"호출자 토큰으로 조회·workflow 실행"| harnessGit`, `deployApi -->|"workflow_dispatch"| applyJob`, `applyJob -->|"CLI로 생성·수정 후 Git 반영"| harnessGit`.
   - 요소 표에 행 추가: `| 배포 요청 API·워크로드 적용 job | 앱 에이전트의 조회·생성·수정 요청을 받아 GitHub API로 조회하고 호출자 토큰으로 적용 workflow를 실행한다. 파일 수정은 workflow 안의 CLI만 한다. 서버는 비밀 값과 클러스터 권한이 없다. |`

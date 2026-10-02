@@ -29,7 +29,7 @@ K3s 홈랩에서 AI 에이전트가 제한된 JSON 계약과 CLI만으로 애플
 
 | 설계 문서 | 다루는 범위 |
 | --- | --- |
-| [전체 설계](SYSTEM_DESIGN.md) | C4 시스템 관계·컨테이너 수준의 책임과 흐름, Mermaid 다이어그램 |
+| [전체 설계](SYSTEM_DESIGN.md) | C4 시스템 관계·컨테이너 수준의 책임과 흐름. 그림은 [대표 관계도](docs/diagrams/README.md) |
 | [워크로드 플랫폼 설계](docs/WORKLOAD_PLATFORM.md) | 기존 하네스의 워크로드 계약, 공유 DB·레지스트리 모델, 에이전트·CI 인터페이스 계약, Argo CD 정책 |
 | [Secret Manage System](docs/SECRET_MANAGE_SYSTEM.md) | API 규약과 공유 PostgreSQL 저장·운영 설계 |
 | [공통 GitHub Action](docs/GITHUB_ACTION.md) | Action의 구조, 호출 권한, 다른 레포에서의 사용법 |
