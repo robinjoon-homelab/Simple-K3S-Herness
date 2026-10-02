@@ -1,31 +1,49 @@
 # 홈랩 앱과 배포·운영 서비스
 
-[편집 가능한 draw.io 원본](homelab-application-platform.drawio)
-
-단일 페이지·단일 캔버스 관계도다. 하네스와 앱의 연결을 보여주며, **k3s 내부 서비스는 C1처럼 역할만 가진 하나의 상자**로 표현한다. 실제 프로세스·컨트롤러 구성이나 저장소 내부 구조는 펼치지 않는다.
-
-- Traefik은 k3s의 기본 앱 접속 기능에 포함한다.
-- CNPG와 공유 PostgreSQL은 하나의 DB 서비스로 합친다.
-- Reflector는 실행용 시크릿 관리에 포함한다.
-- Argo CD, zot, cert-manager, k3s Secrets, SMS와 Tailscale VPN은 각각 역할만 표시한다.
-- Tailscale VPN은 홈 LAN 접근용이며 장애 복구용이 아니다. 인증 등록·외부 접속 검증 상태는 [VPN 운영 절차](../runbooks/vpn.md)를 따른다.
-- 개인용 앱들은 동등한 배포 대상 하나의 그룹으로 표시한다. 특정 앱이 구조의 중심이 되지 않는다.
-
-주 배포 흐름은 왼쪽에서 오른쪽으로 한 줄에 배치한다.
-
-`앱 소스 저장소 → 앱 CI → 하네스 릴리스 job → 하네스 Git 저장소 → Argo CD → k3s → 개인용 애플리케이션들`
-
-- 위쪽에는 운영자의 배포 구성 작업과 외부 배포원·인증서 서비스를 둔다.
-- 아래쪽에는 CI에서 k3s로 이어지는 이미지 전달 경로를 둔다.
-- OIDC와 SMS는 CI 아래, 실행용 시크릿과 DB는 앱 아래에 둔다.
-- 굵은 파란 선은 주 배포 흐름, 회색 점선은 운영자의 직접 작업이다. 인증·시크릿 조회는 보라색, 이미지 전달은 주황색으로 구분한다.
-
-23개 요소와 31개 연결선이 하나의 그래프로 이어진다. 아래쪽에는 외부 개인 기기 → Tailscale VPN → 홈 LAN 경로와 외부 Tailscale 관리 서비스를 둔다. Argo CD는 VPN 배포 선언을 동기화하고, Tailscale 관리 서비스는 계정·기기 등록·접근 정책을 담당한다. 실제 mxGraph 렌더링으로 상자·라벨 배치를 확인했다. PNG 미리보기는 3540×2350이다.
+하네스의 유일한 시스템 그림이다. 편집 원본은 [draw.io 파일](homelab-application-platform.drawio)이고, PNG는 원본에서 만든 미리보기다. 각 요소의 책임과 흐름은 [전체 설계](../architecture/system.md)가 글로 설명한다.
 
 ![홈랩 앱과 배포·운영 서비스](homelab-application-platform.png)
 
-앱 개발 에이전트는 배포 요청 API로 워크로드를 조회·생성·수정한다. API는 GitHub API로 하네스 Git을 읽고, 호출자 토큰으로 워크로드 적용 job을 실행한다. job 안의 CLI만 파일을 수정해 하네스 Git에 커밋한다. 요청과 workflow 실행은 인증 요청이므로 보라색, 적용 job의 Git 반영은 파란 선으로 그렸다. API의 GitHub 조회는 상자 설명에 적고 연결선은 생략했다.
+## 그림의 수준
 
-화살표는 라벨에 적힌 호출·처리·값 공급 방향이다. 주 배포 흐름의 Git → Argo CD와 이미지 경로의 zot → k3s는 정보 공급 방향으로 그렸으며, 실제 조회·pull 주체를 라벨에 명시했다. 응답선과 서비스 내부 동작은 생략했다. 현재 SMS는 PostgreSQL에 CI 시크릿과 허용 정책을 저장하고, SMS 자체 CI는 서비스 중단 중에도 배포할 수 있도록 GitHub Secrets를 사용한다. SMS의 Kubernetes Secret 직접 저장 제안은 현재 구조에 포함하지 않았다.
+단일 페이지·단일 캔버스 관계도다. k3s 안의 서비스는 역할만 가진 상자 하나로 그리고, 실제 프로세스·컨트롤러나 저장소 내부 구조는 펼치지 않는다.
 
-기존 하네스 Git → Argo CD 연결에는 `traefik-policy`의 공용 접속 정책도 포함한다. HelmChartConfig와 공용 Middleware로 Traefik의 HTTP→HTTPS 전환·HSTS를 설정하며, 일반 앱·Argo CD·레지스트리에 함께 적용한다. 인증서 발급·갱신은 cert-manager가 담당한다. 기존 기본 접속 기능 안의 정책이므로 상자나 연결선은 추가하지 않는다. Argo CD 서버 재시작은 필요하지 않으며, Traefik의 Helm 적용과 자동 rollout은 Application 동기화와 별도로 확인한다. [정책 적용과 확인](../runbooks/traefik-https.md)을 따른다.
+- Traefik은 k3s의 기본 앱 접속 기능에 포함한다. 공용 HTTPS 정책도 이 기능 안의 설정이므로 따로 그리지 않는다.
+- CNPG와 공유 PostgreSQL은 DB 서비스 하나로 합친다.
+- Reflector는 실행용 시크릿 관리에 포함한다.
+- Argo CD, zot, cert-manager, k3s Secrets, SMS, Tailscale VPN은 각각 역할만 표시한다. VPN은 홈 LAN 접근용이며 장애 복구용이 아니다.
+- 개인용 앱들은 동등한 배포 대상 하나의 그룹으로 그린다. 특정 앱이 구조의 중심이 되지 않는다.
+- 응답선과 서비스 내부 동작은 생략한다.
+
+## 배치와 범례
+
+주 배포 흐름은 왼쪽에서 오른쪽으로 한 줄에 둔다. 앱 소스 저장소, 앱 CI, 하네스 릴리스 job, 하네스 Git 저장소, Argo CD, k3s, 개인용 애플리케이션 순서다.
+
+- 위쪽에는 운영자의 배포 구성 작업, 앱 개발 에이전트와 배포 요청 API, 외부 배포원과 인증서 서비스를 둔다.
+- 아래쪽에는 CI에서 k3s로 가는 이미지 전달 경로를 둔다.
+- OIDC와 SMS는 CI 아래에, 실행용 시크릿과 DB는 앱 아래에 둔다.
+- 맨 아래에는 외부 개인 기기, Tailscale VPN, 홈 LAN 경로와 외부 Tailscale 관리 서비스를 둔다.
+
+| 선 | 뜻 |
+| --- | --- |
+| 굵은 파란 선 | 주 배포 흐름과 하네스 Git 반영 |
+| 회색 점선 | 운영자의 직접 작업 |
+| 보라색 선 | 인증과 시크릿 조회, 토큰으로 하는 요청 |
+| 주황색 선 | 이미지 전달 |
+
+화살표는 라벨에 적힌 호출·처리·값 공급 방향이다. Git에서 Argo CD로, zot에서 k3s로 가는 선은 정보가 흘러가는 방향으로 그리고 실제로 조회하거나 pull하는 주체를 라벨에 적었다. 배포 요청 API가 GitHub API로 하네스 Git을 읽는 관계는 상자 설명에 적고 선은 생략했다.
+
+## 그림 고치기
+
+1. [draw.io](https://www.drawio.com/)로 원본을 고친다. 상자와 선은 기존 스타일을 복사해 쓴다.
+2. 저장소 루트에서 PNG를 다시 만든다.
+
+   ```bash
+   python3 tools/render_diagram.py
+   ```
+
+   스크립트는 원본을 바꾸지 않는다. 렌더링용 사본을 만들어 헤드리스 Chrome으로 3540×2350 PNG를 찍고, 기존 내보내기와 여백을 맞추려고 사본에만 투명한 기준 셀을 넣는다. 찍은 PNG에서 흰색이 아닌 픽셀이 5%보다 적으면 뷰어가 그리지 못한 것으로 보고 기존 PNG를 그대로 둔다. Chrome(또는 Chromium)과 jsDelivr 접속이 필요하다. Chrome을 찾지 못하면 `--chrome`으로 실행 파일을 지정한다.
+3. 만든 PNG를 열어 라벨과 선이 겹치거나 잘리지 않았는지 눈으로 확인한다.
+4. 원본과 PNG를 같은 커밋에 넣는다.
+
+뷰어는 원본 XML의 `mxfile` 버전과 같은 draw.io 태그로 고정한다(`tools/render_diagram.py`의 `VIEWER_URL`). draw.io가 저장한 버전이 바뀌면 이 태그도 함께 올린다. 두 값이 다르면 `tests/test_render_diagram.py`가 실패한다. 같은 원본이라도 Chrome이나 글꼴이 다르면 PNG 바이트가 달라질 수 있으므로 픽셀 단위 일치는 요구하지 않는다.
