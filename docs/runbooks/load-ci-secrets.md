@@ -1,10 +1,10 @@
 # CI 자격증명 연동 절차
 
-앱 CI가 SMS에서 레지스트리·하네스 자격증명을 받아 이미지를 발행하고 하네스 릴리스를 요청하도록 연결하는 절차다. Action의 입력·출력 규칙은 [공통 Action 계약](../contracts/load-ci-secrets.md)이, SMS의 조회 API와 OIDC 조건은 [SMS 외부 계약](../contracts/sms.md)이 정한다. 앱 에이전트용 CI 예제는 [`server/deploy_api/guide.md`](../../server/deploy_api/guide.md)에도 있다. 지난 확인 결과는 [검증 기록](../records/ci-secrets.md)에 있다.
+앱 CI가 SMS에서 레지스트리·하네스 자격증명을 받아 이미지를 발행하고 하네스 릴리스를 요청하도록 연결하는 절차다. Action의 입력·출력 규칙은 [`load-ci-secrets` Action 계약](../contracts/load-ci-secrets.md)이, SMS의 조회 API와 OIDC 조건은 [SMS 외부 계약](../contracts/sms.md)이 정한다. 앱 에이전트용 CI 예제는 [`server/deploy_api/guide.md`](../../server/deploy_api/guide.md)에도 있다. 지난 확인 결과는 [검증 기록](../records/ci-secrets.md)에 있다.
 
 ## SMS 허용 정책 등록
 
-SMS는 허용 정책에 등록된 저장소·브랜치·이벤트·workflow의 실행만 CI 값을 조회하게 한다. 허용된 실행은 모든 앱 이름의 값을 조회할 수 있으므로 꼭 필요한 workflow만 등록한다.
+SMS는 허용 정책에 등록된 저장소·브랜치·이벤트·워크플로의 실행만 CI 값을 조회하게 한다. 허용된 실행은 모든 앱 이름의 값을 조회할 수 있으므로 꼭 필요한 워크플로만 등록한다.
 
 1. 저장소 ID와 소유자 ID를 확인한다.
 
@@ -13,7 +13,7 @@ SMS는 허용 정책에 등록된 저장소·브랜치·이벤트·workflow의 �
    ```
 
 2. `https://secrets.homelab.robinjoon.xyz/admin/repositories`에 운영자로 로그인해 "레포 등록"을 누른다.
-3. 레포 이름(표시용), 레포 ID, 소유자 ID를 넣는다.
+3. 저장소 이름(표시용), 저장소 ID, 소유자 ID를 넣는다.
 4. 허용 브랜치·태그에 `refs/heads/<branch>`를, 허용 이벤트에 `push`와 필요하면 `workflow_dispatch`를 한 줄에 하나씩 넣는다. `pull_request`와 `pull_request_target`은 허용할 수 없다.
 5. 허용 워크플로에 `<owner>/<repo>/.github/workflows/<file>@refs/heads/<branch>`를 넣는다. 와일드카드는 쓸 수 없다.
 6. "허용 정책 저장"을 누른다. 다음 권한 검사부터 적용된다.
@@ -46,7 +46,7 @@ steps:
       password: ${{ env.REGISTRY_PASSWORD }}
 ```
 
-- `id-token: write`는 호출 job에 준다. Action이 스스로 권한을 높이지 않는다. OIDC 신원은 Action이 있는 하네스가 아니라 호출한 앱 저장소의 workflow다. [OIDC 토큰 발급 권한](https://docs.github.com/en/actions/reference/security/oidc#workflow-permissions-for-the-requesting-the-oidc-token)
+- `id-token: write`는 호출 job에 준다. Action이 스스로 권한을 높이지 않는다. OIDC 신원은 Action이 있는 하네스가 아니라 호출한 앱 저장소의 워크플로다. [OIDC 토큰 발급 권한](https://docs.github.com/en/actions/reference/security/oidc#workflow-permissions-for-the-requesting-the-oidc-token)
 - `permissions`를 적으면 적지 않은 권한은 `none`이 되므로 job에 필요한 기존 권한도 함께 적는다.
 - 받은 값은 같은 job의 후속 step에서 `${{ env.* }}`나 셸 환경변수로 쓴다. `${{ secrets.* }}`로는 읽을 수 없다.
 - 레지스트리 주소는 GitHub Variable(예: `HOMELAB_REGISTRY_HOST`)로 둔다. 값이 있는지는 출력하지 않고 검사한다.
@@ -57,7 +57,7 @@ steps:
 
 이미지는 `latest` 대신 커밋 SHA를 담은 새 태그로 push한다. CI 로그에 `REGISTRY_PASSWORD`를 출력하지 않는다.
 
-push가 성공하면 하네스의 `Release workload image` workflow를 요청한다. 앱 CI는 GitOps 파일을 직접 고치지 않고 앱 이름, 기존 컨테이너 이름, 새 이미지 태그만 넘긴다.
+push가 성공하면 하네스의 `Release workload image` 워크플로를 요청한다. 앱 CI는 GitOps 파일을 직접 고치지 않고 앱 이름, 기존 컨테이너 이름, 새 이미지 태그만 넘긴다.
 
 ```yaml
 - name: Request a workload release
@@ -75,7 +75,7 @@ push가 성공하면 하네스의 `Release workload image` workflow를 요청한
 
 `steps.image.outputs.tag`는 이미지 태그를 출력하는 빌드 step의 ID에 맞춘다. job 수준 `env`에서 `IMAGE_TAG`를 이미 정의했다면 이 줄은 빼도 된다. 태그가 비어 있으면 `release.py`가 요청을 거부한다.
 
-workflow는 `tools/release.py`로 태그 하나만 바꾸고 Helm 검증을 통과한 변경만 `main`에 커밋·push한다. 요청은 직렬로 처리하며, 다른 커밋과 겹쳐 첫 push가 실패하면 최신 `main` 위로 한 번 rebase한 뒤 다시 push한다. `main` 브랜치 보호가 Actions의 직접 push를 막으면 이 봇의 push를 허용하거나 PR 기반 흐름으로 바꿔야 한다.
+워크플로는 `tools/release.py`로 태그 하나만 바꾸고 Helm 검증을 통과한 변경만 `main`에 커밋·push한다. 요청은 직렬로 처리하며, 다른 커밋과 겹쳐 첫 push가 실패하면 최신 `main` 위로 한 번 rebase한 뒤 다시 push한다. `main` 브랜치 보호가 Actions의 직접 push를 막으면 이 봇의 push를 허용하거나 PR 기반 흐름으로 바꿔야 한다.
 
 `release.py`는 이미지 repository를 바꾸지 않고, OCI 태그 문법에 맞지 않는 값과 `latest`를 거부한다. 같은 태그를 다시 요청하면 성공으로 처리하되 커밋을 만들지 않는다. 커밋 성공은 요청이 Git에 기록됐다는 뜻이며 Argo CD 동기화나 Pod 준비를 보장하지 않는다. 동작만 로컬에서 확인하려면 다음을 실행한다.
 

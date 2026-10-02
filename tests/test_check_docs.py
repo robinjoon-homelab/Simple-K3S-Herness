@@ -16,7 +16,7 @@ WORKFLOW = ROOT / ".github/workflows/test.yml"
 RELEASE_WORKFLOW = ROOT / ".github/workflows/release-workload-image.yml"
 
 
-class DocLinksTest(unittest.TestCase):
+class GitDocsTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -33,8 +33,20 @@ class DocLinksTest(unittest.TestCase):
         if tracked:
             subprocess.run(["git", "add", "--", name], cwd=self.root, check=True)
 
+    def write_structure(self):
+        self.write("docs/README.md", "# 문서 색인\n")
+        self.write("docs/diagrams/README.md", "# 그림 안내\n")
+        self.write("AGENTS.md", "# 공통 지침\n")
+        self.write("CLAUDE.md", "@AGENTS.md\n")
+        self.write("GEMINI.md", "@AGENTS.md\n")
+        self.write(".github/copilot-instructions.md", "[공통 지침](../AGENTS.md)\n")
+        self.write(check_docs.DIAGRAM, "<mxfile/>\n")
+
+
+class DocLinksTest(GitDocsTest):
     def problems(self):
-        return [str(problem) for problem in check_docs.check_repository(self.root)]
+        # 링크 문법 시험은 하네스의 필수 파일 배치와 분리한다.
+        return [str(problem) for problem in check_docs.check_repository(self.root, check_structure=False)]
 
     def test_relative_files_images_directories_and_root_paths(self):
         self.write("README.md", "[문서](docs/)\n![그림](docs/picture.png)\n")
@@ -213,6 +225,7 @@ class DocLinksTest(unittest.TestCase):
         self.assertTrue(all("추적 파일" in problem for problem in problems), problems)
 
     def test_cli_exit_code_and_error_location(self):
+        self.write_structure()
         self.write("README.md", "[오류](missing.md)\n")
         result = subprocess.run(
             [sys.executable, str(ROOT / "tools/check_docs.py"), "--root", str(self.root)],
@@ -229,6 +242,142 @@ class DocLinksTest(unittest.TestCase):
 
     def test_real_repository_passes(self):
         self.assertEqual(check_docs.check_repository(ROOT), [])
+
+
+class DocStructureTest(GitDocsTest):
+    def setUp(self):
+        super().setUp()
+        self.write_structure()
+
+    def problems(self):
+        return [str(problem) for problem in check_docs.check_repository(self.root)]
+
+    def untrack(self, name):
+        subprocess.run(["git", "rm", "--cached", "--quiet", "--", name], cwd=self.root, check=True)
+
+    def test_index_and_diagram_readme_do_not_need_self_links(self):
+        self.assertEqual(self.problems(), [])
+
+    def test_index_must_directly_link_every_doc_including_archived_designs(self):
+        self.write("docs/guide.md", "[지난 설계](design/archive/old.md)\n")
+        self.write("docs/design/archive/old.md", "# 지난 설계\n")
+        self.write("docs/README.md", "[안내](guide.md)\n")
+        problems = self.problems()
+        self.assertEqual(len(problems), 1)
+        self.assertTrue(problems[0].startswith("docs/design/archive/old.md:1:"), problems)
+        self.assertIn("직접 연결", problems[0])
+        self.write("docs/README.md", "[안내](guide.md)\n[지난 설계](design/archive/old.md)\n")
+        self.assertEqual(self.problems(), [])
+
+    def test_index_accepts_references_html_encoded_paths_and_directory_readmes(self):
+        self.write("docs/한글 안내.md", "# 안내\n")
+        self.write("docs/topic/README.md", "# 주제\n")
+        self.write("docs/other.md", "# 기타\n")
+        self.write("docs/README.md", """[안내][guide]
+[주제](topic/)
+<a href="other.md">기타</a>
+[guide]: %ED%95%9C%EA%B8%80%20%EC%95%88%EB%82%B4.md#안내
+""")
+        self.assertEqual(self.problems(), [])
+
+    def test_code_examples_and_external_urls_do_not_satisfy_the_index(self):
+        self.write("docs/guide.md", "# 안내\n")
+        self.write("docs/README.md", "```md\n[예제](guide.md)\n```\n[외부](https://example.invalid/guide.md)\n")
+        self.assertIn("직접 연결", self.problems()[0])
+
+    def test_requires_tracked_index_and_agent_entry_files(self):
+        for name in ("docs/README.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md"):
+            with self.subTest(name=name):
+                self.untrack(name)
+                self.assertTrue(any(p.startswith(name + ":1:") and "추적해야" in p for p in self.problems()))
+                self.write_structure()
+
+    def test_agent_links_and_code_examples_do_not_replace_imports(self):
+        for name in ("CLAUDE.md", "GEMINI.md"):
+            with self.subTest(name=name):
+                self.write(name, "[지침](AGENTS.md)\n```md\n@AGENTS.md\n```\n<!-- @AGENTS.md -->\n")
+                self.assertTrue(any(p.startswith(name + ":1:") and "import" in p for p in self.problems()))
+                self.write(name, "@./AGENTS.md\n")
+        self.assertEqual(self.problems(), [])
+
+    def test_copilot_requires_a_local_link_to_agents(self):
+        name = ".github/copilot-instructions.md"
+        self.write(name, "AGENTS.md를 읽는다. [웹](https://example.invalid/AGENTS.md)\n")
+        self.assertEqual(len(self.problems()), 1)
+        self.assertIn("AGENTS.md로 가는 링크", self.problems()[0])
+        self.write(name, '<a href="../AGENTS.md">지침</a>\n')
+        self.assertEqual(self.problems(), [])
+
+    def test_malformed_import_reports_a_problem_without_crashing(self):
+        self.write("CLAUDE.md", "@https://[.md\n")
+        self.assertTrue(any("잘못된 링크" in p for p in self.problems()))
+        self.assertTrue(any("import" in p for p in self.problems()))
+
+    def test_requires_exactly_the_canonical_drawio_file(self):
+        self.write("docs/diagrams/extra.drawio", "<mxfile/>\n")
+        self.assertTrue(any("draw.io 원본" in p for p in self.problems()))
+        self.untrack(check_docs.DIAGRAM)
+        self.assertTrue(any("draw.io 원본" in p for p in self.problems()))
+        self.untrack("docs/diagrams/extra.drawio")
+        self.assertTrue(any("draw.io 원본" in p for p in self.problems()))
+
+    def test_mermaid_fences_are_rejected_in_docs_and_records_with_line_numbers(self):
+        self.write("docs/README.md", "# 색인\n\n> ~~~mermaid\n> graph LR\n> ~~~\n")
+        problems = self.problems()
+        self.assertEqual(len(problems), 1)
+        self.assertTrue(problems[0].startswith("docs/README.md:3:"), problems)
+        self.write("docs/records/history.md", "```mermaid\ngraph LR\n```\n")
+        self.write("docs/README.md", "[기록](records/history.md)\n")
+        self.assertIn("Mermaid", self.problems()[0])
+
+    def test_mermaid_examples_comments_and_archived_designs_are_allowed(self):
+        self.write("docs/design/archive/old.md", "```mermaid\ngraph LR\n```\n")
+        self.write("docs/README.md", """[지난 설계](design/archive/old.md)
+````markdown
+```mermaid
+graph LR
+```
+````
+<!--
+```mermaid
+graph LR
+```
+-->
+`mermaid`라는 언어 표시를 검사한다.
+""")
+        self.assertEqual(self.problems(), [])
+
+    def test_removed_commands_in_code_and_prose_are_rejected(self):
+        commands = [f"python3 tools/platform.py {command}" for command in ("doctor", "schema", "list", "validate", "render")]
+        commands += ['python3 "tools/platform.py" validate', "./platform.py " + chr(92) + "\n  render"]
+        for command in commands:
+            with self.subTest(command=command):
+                self.write("docs/README.md", "# 색인\n\n```sh\n" + command + "\n```\n")
+                problems = self.problems()
+                self.assertEqual(len(problems), 1)
+                self.assertTrue(problems[0].startswith("docs/README.md:4:"), problems)
+                self.assertIn("폐기된 CLI", problems[0])
+        self.write("docs/README.md", "# 색인\n")
+        self.write("README.md", "`tools/platform.py doctor`를 실행한다.\n")
+        self.assertIn("폐기된 CLI", self.problems()[0])
+
+    def test_historical_commands_comments_and_ordinary_words_are_allowed(self):
+        self.write("docs/records/history.md", "`platform.py validate`를 실행했다.\n")
+        self.write("docs/design/archive/old.md", "```sh\npython3 tools/platform.py render\n```\n")
+        self.write("docs/README.md", """[기록](records/history.md)
+[설계](design/archive/old.md)
+스키마 검증과 Helm 렌더링은 계속 사용한다. schema, list, render라는 단어도 허용한다.
+`platform.py create`와 `platform.py get`을 사용한다.
+`my-platform.py schema`와 `platform.py render-extra`는 폐기 명령과 다르다.
+<!-- python3 tools/platform.py doctor -->
+""")
+        self.assertEqual(self.problems(), [])
+
+    def test_untracked_files_do_not_affect_structure_or_get_read(self):
+        self.write("docs/security/private.md", b"\xff", tracked=False)
+        self.write("docs/design/active/proposal.md", "```mermaid\nplatform.py doctor\n", tracked=False)
+        self.write("docs/diagrams/untracked.drawio", b"\xff", tracked=False)
+        self.assertEqual(self.problems(), [])
 
 
 class HarnessWorkflowTest(unittest.TestCase):

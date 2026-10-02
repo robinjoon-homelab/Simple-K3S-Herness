@@ -13,7 +13,7 @@
 | [워크로드 계약](contracts/workload.md) | 워크로드 JSON 계약, 공유 DB·레지스트리 모델, CLI·릴리스 인터페이스, Argo CD 정책 |
 | [배포 요청 API 계약](contracts/deploy-api.md) | API 엔드포인트, 요청·오류, 인증과 권한 |
 | [SMS 외부 계약](contracts/sms.md) | CI 조회 API, OIDC 조건, 배포 입력과 저장 책임 |
-| [공통 Action 계약](contracts/load-ci-secrets.md) | `load-ci-secrets` Action의 입력·전달·실패 규칙과 검증 기준 |
+| [`load-ci-secrets` Action 계약](contracts/load-ci-secrets.md) | `load-ci-secrets` Action의 입력·전달·실패 규칙과 검증 기준 |
 
 ## 운영 절차
 
@@ -32,7 +32,7 @@
 
 주제별로 날짜 절을 아래로 쌓는다. 각 기록은 그날의 관찰이며 현재 상태를 보장하지 않는다.
 
-- [SMS와 공통 Action 연동](records/ci-secrets.md)
+- [SMS와 `load-ci-secrets` Action 연동](records/ci-secrets.md)
 - [배포 요청 API](records/deploy-api.md)
 - [공용 Traefik HTTPS 정책](records/traefik-https.md)
 - [홈 LAN VPN](records/vpn.md)

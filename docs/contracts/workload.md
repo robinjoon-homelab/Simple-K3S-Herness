@@ -1,8 +1,8 @@
-# K3s + Argo CD 워크로드 관리 시스템 설계서
+# 워크로드 계약
 
 ## 1. 목적과 범위
 
-이 저장소는 AI 에이전트가 Kubernetes 매니페스트를 직접 생성하지 않고, 제한된 JSON Contract와 CLI를 통해 K3s 홈랩 앱을 배포하게 하는 GitOps 하네스다.
+워크로드 JSON의 허용 범위, 구성 CLI와 CI 릴리스 인터페이스, Argo CD의 적용 규칙을 정한다. AI 에이전트는 Kubernetes 매니페스트를 직접 생성하지 않고 이 계약과 CLI로 k3s 홈랩 앱을 배포한다.
 
 현재 공식 지원 범위는 단순한 `Deployment` 기반 앱이다. 고가용성, 앱별 데이터베이스 인스턴스, 앱별 PostgreSQL 계정/Secret은 목표가 아니다. 공유 데이터베이스와 자체 컨테이너 레지스트리는 이 계약으로 생성하는 워크로드가 아니라, 별도의 공통 인프라로 관리한다.
 
@@ -21,11 +21,11 @@
 
 1. 운영자나 하네스의 AI 에이전트가 `tools/platform.py`의 `create`·`get`·`patch`로 워크로드를 조회하거나 변경한다. CLI가 관리하는 파일은 `workloads/<app>/values.json`과 `argocd/managed/apps/<app>.yaml`이다.
 2. 운영자가 변경을 커밋·push하면 Argo CD Root Application이 Child Application을 동기화한다.
-3. Child Application은 공통 Helm Chart로 워크로드를 렌더링하고 k3s에 적용한다. 앱 저장소의 에이전트는 [배포 요청 API와 워크로드 적용 workflow](#배포-요청-api와-워크로드-적용-workflow)로 같은 CLI를 호출한다.
+3. Child Application은 공통 Helm Chart로 워크로드를 렌더링하고 k3s에 적용한다. 앱 저장소의 에이전트는 [배포 요청 API와 워크로드 적용 워크플로](#배포-요청-api와-워크로드-적용-workflow)로 같은 CLI를 호출한다.
 
 앱 CI는 기존 컨테이너의 이미지 태그만 바꾼다.
 
-1. 앱 CI가 이미지를 발행한 뒤 `app`·`container`·`tag`를 입력으로 하네스 릴리스 workflow를 호출한다.
+1. 앱 CI가 이미지를 발행한 뒤 `app`·`container`·`tag`를 입력으로 하네스 릴리스 워크플로를 호출한다.
 2. 하네스의 GitHub Actions job이 `tools/release.py`로 태그를 바꾸고 커밋·push한다.
 3. Argo CD Child Application이 공통 Helm Chart로 변경된 워크로드를 렌더링해 k3s에 적용한다.
 
@@ -45,7 +45,7 @@ Chart가 계약에 따라 다음 리소스를 렌더링한다.
 
 공통 Chart에 `ingresses`를 선언하면 각 Ingress는 `tls.mode: cert-manager`를 반드시 지정해야 하며 Ingress class는 `traefik`으로 고정한다. Ingress를 선언하지 않는 내부 앱은 허용한다. TLS 생략·비활성화나 다른 Ingress class로 HTTP 앱 응답을 허용하는 구성은 검증에 실패한다.
 
-Chart는 각 Ingress 선언에 대해 `websecure` entrypoint의 TLS Ingress 하나와 Certificate를 만든다. 기존 TLS Ingress·Certificate·Secret 이름은 유지한다. 앱별 HTTP Ingress·Traefik Middleware는 만들지 않으며 Ingress 이름은 63자 이하 DNS-1123 label이다. HTTPS 강제 설정은 워크로드 annotations로 해제할 수 없다. TLS는 Traefik에서 종료하며 Service·Pod까지의 내부 통신을 TLS로 전환하는 계약은 아니다.
+Chart는 각 Ingress 선언마다 `websecure` entrypoint의 TLS Ingress 하나와 Certificate를 만든다. 기존 TLS Ingress·Certificate·Secret 이름은 유지한다. 앱별 HTTP Ingress·Traefik Middleware는 만들지 않으며 Ingress 이름은 63자 이하 DNS-1123 label이다. HTTPS 강제 설정은 워크로드 annotations로 해제할 수 없다. TLS는 Traefik에서 종료하며 Service·Pod까지의 내부 통신을 TLS로 전환하는 계약은 아니다.
 
 HTTP→HTTPS와 HSTS는 `default` Project의 `traefik-policy` Application이 관리하는 공통 인프라 정책이다. `infrastructure/traefik/resources.yaml`은 `kube-system/platform-https-headers` Middleware와 `kube-system/traefik` HelmChartConfig를 선언한다. HelmChartConfig는 `ports.web.http.redirections.entryPoint`로 `websecure`의 외부 443 포트에 영구 리다이렉트하고, `ports.websecure.http`에서 TLS와 공용 HSTS Middleware를 적용한다. HSTS는 `max-age=31536000`이며 `includeSubDomains`·`preload`는 사용하지 않는다. 이 정책은 일반 앱·Argo CD·레지스트리를 포함한 Traefik 웹 접속에 공통으로 적용한다. cert-manager는 기존 인증서 발급·갱신을 계속 담당한다.
 
@@ -59,7 +59,7 @@ CNPG가 생성한 Secret의 `host`와 `pgpass`는 같은 네임스페이스의 �
 
 CLI가 생성하는 Child Application은 Argo CD `managedNamespaceMetadata`로 앱 네임스페이스에 `simple-k3s-harness.dev/workload=true` 라벨을 붙인다. Reflector는 이 라벨 셀렉터와 일치하는 네임스페이스에만 `shared-db-app`을 자동 복제한다. 따라서 Secret 공유 범위는 모든 네임스페이스가 아니라 하네스가 관리하는 워크로드 네임스페이스로 제한된다.
 
-따라서 데이터베이스 이름은 앱별로 구분되지만 PostgreSQL 서버, 계정, Secret은 공유된다. 이 단순화는 홈랩 목표에 맞춘 의도적인 선택이며, 계정별 권한 격리나 앱별 인스턴스 분리를 제공하지 않는다.
+데이터베이스 이름은 앱별로 구분되지만 PostgreSQL 서버, 계정, Secret은 공유된다. 이 단순화는 홈랩 목표에 맞춘 의도적인 선택이며, 계정별 권한 격리나 앱별 인스턴스 분리를 제공하지 않는다.
 
 ## 4. 컨테이너 레지스트리 모델
 
@@ -77,7 +77,7 @@ zot에 내장된 htpasswd 인증과 저장소 ACL을 사용하고 익명 접근�
 
 ### AI 에이전트 CLI
 
-에이전트가 사용할 명령은 flat 형태로 고정한다.
+에이전트가 사용할 명령은 다음 형식으로 고정한다.
 
 ```text
 create NAME --image IMAGE [--kind KIND] [--db-name NAME] [--file JSON]
@@ -87,21 +87,23 @@ patch NAME --file JSON [--if-match SHA]
 
 `create`·`patch`는 스키마·Helm lint를 통과한 뒤에만 파일을 쓴다. 별도 검증·렌더링 명령은 없다. `--if-match`는 `values.json`의 Git blob SHA를 받아, values를 읽은 뒤의 변경을 덮어쓰지 않게 한다.
 
-일반 앱 배포 구성 작업에서는 에이전트가 CLI를 우회해 values 파일, Argo Application, Helm Chart를 직접 수정하지 않는다. 하네스 자체 기능을 개발하는 작업은 이 제한과 구분하며, 요청된 범위의 CLI·Chart·계약을 함께 수정하고 검증한다. `delete`는 제공하지 않으므로 삭제가 필요하면 운영자가 별도 절차를 수행한다.
+일반 앱 배포 구성 작업에서는 에이전트가 CLI를 우회해 values 파일, Argo Application, Helm Chart를 직접 수정하지 않는다. 하네스 자체 기능을 개발하는 작업은 이 제한과 구분하며, 요청된 범위의 CLI·Chart·계약을 함께 수정하고 검증한다. `delete`는 제공하지 않으므로 삭제가 필요하면 운영자가 별도 절차로 삭제한다.
 
 VPN 인프라가 사용하는 `tailscale` namespace는 일반 앱 이름으로 예약하여 CLI에서 생성할 수 없게 한다.
 
 검증은 JSON Schema와 Helm lint/렌더링에 초점을 둔다. 이것은 클러스터 API 검증, Secret 존재 확인, 네트워크 연결 확인 또는 무중단 배포 보장이 아니다.
 
-### 배포 요청 API와 워크로드 적용 workflow
+<a id="배포-요청-api와-워크로드-적용-workflow"></a>
 
-앱 레포의 에이전트는 [배포 요청 API](deploy-api.md)를 사용한다. 서버는 조회를 GitHub API로 처리하고, 생성·수정은 호출자 GitHub 토큰으로 `.github/workflows/apply-workload.yml`을 실행한다. 이 workflow는 입력을 `platform.py create`·`patch --if-match` 인자로 넘기고, 변경 파일 범위를 확인한 뒤 릴리스 workflow와 같은 동시성 그룹에서 커밋·push한다. 계약 판단은 CLI만 한다.
+### 배포 요청 API와 워크로드 적용 워크플로
+
+앱 저장소의 에이전트는 [배포 요청 API](deploy-api.md)를 사용한다. 서버는 조회를 GitHub API로 처리하고, 생성·수정은 호출자 GitHub 토큰으로 `.github/workflows/apply-workload.yml`을 실행한다. 이 워크플로는 입력을 `platform.py create`·`patch --if-match` 인자로 넘기고, 변경 파일 범위를 확인한 뒤 릴리스 워크플로와 같은 동시성 그룹에서 커밋·push한다. 계약 판단은 CLI만 한다.
 
 ### CI 릴리스 CLI
 
 `tools/release.py NAME --container NAME --tag TAG`는 앱 CI의 이미지 push 이후 실행되는 별도 인터페이스다. 기존 워크로드와 컨테이너가 정확히 하나 존재할 때 이미지 repository와 나머지 워크로드 설정은 그대로 두고 태그만 바꾼다. OCI 태그 문법에 맞지 않는 값과 `latest`를 거부하며, 변경된 전체 values가 Helm lint를 통과하기 전에는 파일을 쓰지 않는다.
 
-`.github/workflows/release-workload-image.yml`은 수동 또는 외부 앱 CI의 `workflow_dispatch` 입력을 받아 Python과 Helm을 준비하고, 릴리스 CLI 실행, 변경 파일 범위 확인, 커밋과 push를 수행한다. Git 인증과 경합 처리는 Actions 워크플로의 책임이며 `release.py`는 Git, 레지스트리, Argo CD, Kubernetes를 직접 조작하지 않는다. 모든 릴리스 요청은 하나의 동시성 그룹에서 직렬화한다.
+`.github/workflows/release-workload-image.yml`은 수동 또는 외부 앱 CI의 `workflow_dispatch` 입력을 받아 Python과 Helm을 준비하고, 릴리스 CLI 실행, 변경 파일 범위 확인, 커밋과 push를 처리한다. Git 인증과 경합 처리는 Actions 워크플로의 책임이며 `release.py`는 Git, 레지스트리, Argo CD, Kubernetes를 직접 조작하지 않는다. 모든 릴리스 요청은 하나의 동시성 그룹에서 직렬화한다.
 
 AI 에이전트는 구성 변경에 `release.py`를 사용하지 않고, 앱 CI는 `platform.py patch`로 이미지 태그를 갱신하지 않는다. 이 인터페이스들 밖에서 `workloads/*/values.json`을 직접 수정하지 않는다.
 
@@ -109,7 +111,7 @@ AI 에이전트는 구성 변경에 `release.py`를 사용하지 않고, 앱 CI�
 
 `homelab-workloads` AppProject는 소스 저장소를 이 저장소 URL(`https://github.com/robinjoon-homelab/Simple-K3S-Herness.git`)로 제한한다. 대상 서버는 기본 Kubernetes API 서버이며 앱마다 namespace가 달라 destinations의 `namespace: "*"`는 유지한다. 이는 모든 namespace에 임의로 배포한다는 운영 목표가 아니라, Child Application의 앱별 namespace를 하나의 Project에서 수용하기 위한 설정이다.
 
-워크로드 Project는 Namespace 생성과 공통 Chart가 직접 만드는 Deployment, Service, ConfigMap, Ingress, cert-manager Certificate, CNPG Database를 허용한다. Argo CD 리소스 트리에서 컨트롤러가 만든 하위 리소스를 확인할 수 있도록 ReplicaSet, Pod, Secret, CertificateRequest, Order, Challenge도 허용한다. 이 하위 리소스들은 JSON Contract가 직접 생성하지 않는다. 기존 앱별 Traefik Middleware의 조회·정리를 위해 해당 허용 항목은 유지하지만 공통 Chart가 새 Middleware를 생성하지는 않는다.
+워크로드 Project는 Namespace 생성과 공통 Chart가 직접 만드는 Deployment, Service, ConfigMap, Ingress, cert-manager Certificate, CNPG Database를 허용한다. Argo CD 리소스 트리에서 컨트롤러가 만든 하위 리소스를 확인할 수 있도록 ReplicaSet, Pod, Secret, CertificateRequest, Order, Challenge도 허용한다. 이 하위 리소스들은 JSON 계약이 직접 생성하지 않는다. 기존 앱별 Traefik Middleware의 조회·정리를 위해 해당 허용 항목은 유지하지만 공통 Chart가 새 Middleware를 생성하지는 않는다.
 
 공유 CNPG Cluster, zot 레지스트리, Tailscale Operator·Connector, 공용 Traefik HTTPS 정책 같은 인프라 리소스는 `default` Project의 인프라 Application과 Root Application이 관리하며, 워크로드 Project에는 이 리소스의 생성 권한을 주지 않는다. `platform/defaults.json`은 모든 앱 values보다 먼저 병합되고 워크로드 계약에서는 덮어쓸 수 없다.
 

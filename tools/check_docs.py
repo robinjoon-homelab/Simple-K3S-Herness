@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Git이 추적하는 Markdown의 로컬 링크와 에이전트 import를 검사한다."""
+"""Git이 추적하는 Markdown의 로컬 링크와 하네스 문서 구조를 검사한다."""
 
 import argparse
 import html
@@ -17,6 +17,15 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 ESCAPE = re.compile(r"\\([!\"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])")
 DEFINITION = re.compile(r"(?m)^ {0,3}\[((?:\\.|[^\]\\\n])+)\]:[ \t]*(?:\n[ \t]*)?")
+AGENT_IMPORT = re.compile(r"(?m)^[ \t]*@([^\s]+\.md)[ \t]*$")
+DOC_INDEX = "docs/README.md"
+DIAGRAM = "docs/diagrams/homelab-application-platform.drawio"
+# 색인은 자신을 연결할 필요가 없고, 그림 안내는 이미지와 함께 별도로 탐색한다.
+INDEX_EXCEPTIONS = {DOC_INDEX, "docs/diagrams/README.md"}
+REMOVED_COMMAND = re.compile(
+    r"(?<![\w.-])platform\.py[\"']?(?:[ \t]|\\\r?\n)+"
+    r"(doctor|schema|list|validate|render)(?=$|[\s`\"';|&<>])"
+)
 
 
 @dataclass(frozen=True)
@@ -33,23 +42,36 @@ def blank(text):
     return re.sub(r"[^\n]", " ", text)
 
 
-def without_fences(text):
-    """길이와 줄 번호를 유지한 채 코드 펜스와 주석을 가린다."""
-    output = []
+def fenced_blocks(text):
+    """코드 펜스의 시작·끝 위치와 언어 표시를 읽는다."""
     fence = None
+    offset = 0
     for line in text.splitlines(keepends=True):
         content = re.sub(r"^ {0,3}(?:> ?)+", "", line)
         marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", content)
         if fence:
-            output.append(blank(line))
             if marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence) and not marker[2].strip():
+                yield start, offset + len(line), language
                 fence = None
         elif marker and not (marker[1][0] == "`" and "`" in marker[2]):
             fence = marker[1]
-            output.append(blank(line))
-        else:
-            output.append(line)
-    return re.sub(r"<!--.*?(?:-->|\Z)", lambda m: blank(m[0]), "".join(output), flags=re.S)
+            start = offset
+            language = marker[2].strip().split(maxsplit=1)[0] if marker[2].strip() else ""
+        offset += len(line)
+    if fence:
+        yield start, len(text), language
+
+
+def without_comments(text):
+    return re.sub(r"<!--.*?(?:-->|\Z)", lambda m: blank(m[0]), text, flags=re.S)
+
+
+def without_fences(text):
+    """길이와 줄 번호를 유지한 채 코드 펜스와 주석을 가린다."""
+    output = list(text)
+    for start, end, _ in fenced_blocks(text):
+        output[start:end] = blank(text[start:end])
+    return without_comments("".join(output))
 
 
 def code_spans(text):
@@ -257,7 +279,7 @@ def parse_document(path, text):
     parser.feed(prose)
     links.extend(parser.links)
     if PurePosixPath(path).name in ("CLAUDE.md", "GEMINI.md"):
-        for match in re.finditer(r"(?m)^[ \t]*@([^\s]+\.md)[ \t]*$", prose):
+        for match in AGENT_IMPORT.finditer(prose):
             links.append((prose.count("\n", 0, match.start()) + 1, match[1]))
 
     anchors = set()
@@ -285,12 +307,85 @@ def parse_document(path, text):
     return anchors, links, problems
 
 
-def check_repository(root):
+def local_target(name, target):
+    """문서 기준 로컬 경로와 앵커를 반환한다. 외부 URL은 제외한다."""
+    parts = urlsplit(html.unescape(target))
+    if parts.scheme or parts.netloc:
+        return None
+    decoded = unquote(parts.path)
+    if decoded.startswith("/"):
+        resolved = posixpath.normpath(decoded.lstrip("/"))
+    elif decoded:
+        resolved = posixpath.normpath(posixpath.join(posixpath.dirname(name), decoded))
+    else:
+        resolved = name
+    return resolved, unquote(parts.fragment)
+
+
+def linked_files(name, documents, directories):
+    for _, target in documents.get(name, (set(), [], []))[1]:
+        try:
+            local = local_target(name, target)
+        except ValueError:
+            continue  # 잘못된 주소는 링크 검사에서 보고한다.
+        if local:
+            resolved = local[0]
+            if resolved in directories:
+                resolved = posixpath.join(resolved, "README.md").removeprefix("./")
+            yield resolved
+
+
+def check_final_structure(tracked, directories, documents, sources):
+    problems = []
+    if DOC_INDEX not in tracked:
+        problems.append(Problem(DOC_INDEX, 1, "문서 색인을 Git으로 추적해야 한다"))
+    indexed = set(linked_files(DOC_INDEX, documents, directories))
+    for name in sorted(tracked):
+        if name.startswith("docs/") and name.lower().endswith(".md") and name not in INDEX_EXCEPTIONS:
+            if name not in indexed:
+                problems.append(Problem(name, 1, f"{DOC_INDEX}에서 문서를 직접 연결해야 한다"))
+
+    for name in ("AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md"):
+        if name not in tracked:
+            problems.append(Problem(name, 1, "공통 에이전트 진입 파일을 Git으로 추적해야 한다"))
+    for name in ("CLAUDE.md", "GEMINI.md"):
+        if name in sources:
+            imports = AGENT_IMPORT.findall(without_inline_code(without_fences(sources[name])))
+            has_import = False
+            for target in imports:
+                try:
+                    has_import |= local_target(name, target) == ("AGENTS.md", "")
+                except ValueError:
+                    pass  # 주소 오류는 링크 검사에서 보고한다.
+            if not has_import:
+                problems.append(Problem(name, 1, "@AGENTS.md로 공통 지침을 import해야 한다"))
+    copilot = ".github/copilot-instructions.md"
+    if copilot in sources and "AGENTS.md" not in set(linked_files(copilot, documents, directories)):
+        problems.append(Problem(copilot, 1, "공통 AGENTS.md로 가는 링크가 필요하다"))
+
+    diagrams = {name for name in tracked if name.lower().endswith(".drawio")}
+    if diagrams != {DIAGRAM}:
+        problems.append(Problem(DIAGRAM, 1, f"draw.io 원본은 이 파일 하나만 추적해야 한다: {sorted(diagrams)}"))
+
+    for name, source in sources.items():
+        visible = without_comments(source)
+        if name.startswith("docs/") and not name.startswith("docs/design/archive/"):
+            for start, _, language in fenced_blocks(visible):
+                if language.casefold() == "mermaid":
+                    problems.append(Problem(name, visible.count("\n", 0, start) + 1, "별도 Mermaid 그림 대신 목록이나 표를 쓴다"))
+        if not name.startswith(("docs/design/archive/", "docs/records/")):
+            for match in REMOVED_COMMAND.finditer(visible):
+                problems.append(Problem(name, visible.count("\n", 0, match.start()) + 1, f"폐기된 CLI 명령이다: platform.py {match[1]}"))
+    return problems
+
+
+def check_repository(root, *, check_structure=True):
     tracked = set(subprocess.check_output(
         ["git", "ls-files", "-z"], cwd=root,
     ).decode("utf-8").split("\0")) - {""}
     directories = {str(parent) for name in tracked for parent in PurePosixPath(name).parents}
     documents = {}
+    sources = {}
     problems = []
     for name in sorted(tracked):
         if not name.lower().endswith(".md"):
@@ -300,35 +395,28 @@ def check_repository(root):
             problems.append(Problem(name, 1, "심볼릭 링크 문서는 검사할 수 없다"))
             continue
         try:
-            documents[name] = parse_document(name, path.read_text(encoding="utf-8"))
+            sources[name] = path.read_text(encoding="utf-8")
+            documents[name] = parse_document(name, sources[name])
         except (OSError, UnicodeError) as error:
             problems.append(Problem(name, 1, f"추적 문서를 읽을 수 없다: {error}"))
 
     for name, (_, links, parse_problems) in documents.items():
         problems.extend(parse_problems)
         for line, target in links:
-            target = html.unescape(target)
             try:
-                parts = urlsplit(target)
+                local = local_target(name, target)
             except ValueError:
                 problems.append(Problem(name, line, f"잘못된 링크 주소: {target}"))
                 continue
-            if parts.scheme or parts.netloc:
+            if local is None:
                 continue
-            decoded = unquote(parts.path)
-            if decoded.startswith("/"):
-                resolved = posixpath.normpath(decoded.lstrip("/"))
-            elif decoded:
-                resolved = posixpath.normpath(posixpath.join(posixpath.dirname(name), decoded))
-            else:
-                resolved = name
+            resolved, fragment = local
             if resolved not in tracked and resolved not in directories:
                 problems.append(Problem(name, line, f"추적 파일 또는 디렉터리가 없다: {target}"))
                 continue
             if not (root / resolved).exists():
                 problems.append(Problem(name, line, f"작업 트리에 대상이 없다: {target}"))
                 continue
-            fragment = unquote(parts.fragment)
             if fragment and resolved in directories:
                 resolved = posixpath.join(resolved, "README.md").removeprefix("./")
                 if resolved not in documents:
@@ -336,6 +424,8 @@ def check_repository(root):
                     continue
             if fragment and resolved in documents and fragment not in documents[resolved][0]:
                 problems.append(Problem(name, line, f"제목 또는 HTML 앵커가 없다: {target}"))
+    if check_structure:
+        problems.extend(check_final_structure(tracked, directories, documents, sources))
     return sorted(problems, key=lambda problem: (problem.path, problem.line, problem.message))
 
 
@@ -351,7 +441,7 @@ def main():
     for problem in problems:
         print(problem, file=sys.stderr)
     if not problems:
-        print("문서 링크 검사 통과")
+        print("문서 링크·구조 검사 통과")
     return 1 if problems else 0
 
 
