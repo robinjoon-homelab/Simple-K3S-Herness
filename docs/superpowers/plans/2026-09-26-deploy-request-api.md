@@ -1946,7 +1946,7 @@ git commit -m "feat(server): add deploy API image and build workflow"
 - [ ] **Step 2: `AGENTS.md`**
   - 8행을 다음으로 바꾼다: "이 저장소 `Simple-K3S-Herness`는 **배포 하네스**다. 일반 앱 소스와 비밀 값의 저장소가 아니다. 워크로드 계약, 공통 Helm Chart, 공통 인프라 선언, 구성 CLI, CI 릴리스·워크로드 적용 workflow, 공통 Secret 조회 Action, 하네스 자체 서비스인 배포 요청 API(`server/`)의 소스와 이미지 빌드를 소유한다."
   - 주 배포 흐름 문단 뒤에 추가: "앱 레포에서 일하는 에이전트는 배포 요청 API(`https://deploy.homelab.robinjoon.xyz`)로 워크로드를 조회·생성·수정한다. API는 GitHub API로 조회하고 호출자 GitHub 토큰으로 `apply-workload.yml`을 실행하며, 그 workflow가 CLI로 파일을 수정해 커밋한다. 서버는 파일 수정·클러스터 접근·비밀 값 보관을 하지 않는다."
-  - 작업별 문서 표에 행 추가: `| 배포 요청 API·앱 에이전트 연동 | [배포 요청 API](docs/DEPLOY_API.md) |`
+  - 작업별 문서 표에 다음 행을 추가한다(삽입할 Markdown 예제): `| 배포 요청 API·앱 에이전트 연동 | [배포 요청 API](docs/DEPLOY_API.md) |`
 
 - [ ] **Step 3: `SYSTEM_DESIGN.md`**
   > 2026-10-02 갱신: 운영자 결정으로 `SYSTEM_DESIGN.md`의 Mermaid 그림을 제거했다. 아래 L1·L2 Mermaid 수정 지시는 더 이상 적용하지 않는다. 같은 관계는 L1 관계 표와 "주요 흐름과 책임 경계" 6번 항목, 그리고 draw.io 대표 관계도가 담는다. 요소 표에 관한 지시만 유효하다.
@@ -1965,7 +1965,7 @@ git commit -m "feat(server): add deploy API image and build workflow"
 
   마지막 문단 "이 두 인터페이스 밖에서"를 "이 인터페이스들 밖에서"로 바꾼다.
 
-- [ ] **Step 5: 스킬과 관계도 설명** — `skills/homelab-k3s-workloads/SKILL.md` 지원 범위 끝에 "- 앱 레포에서 작업하는 에이전트는 이 스킬 대신 [배포 요청 API](../../docs/DEPLOY_API.md)를 사용합니다."를 추가한다. 관계도 갱신은 Step 6에서 한다.
+- [ ] **Step 5: 스킬과 관계도 설명** — `skills/homelab-k3s-workloads/SKILL.md` 지원 범위 끝에 다음 Markdown 예제를 추가한다: `- 앱 레포에서 작업하는 에이전트는 이 스킬 대신 [배포 요청 API](../../docs/DEPLOY_API.md)를 사용합니다.` 관계도 갱신은 Step 6에서 한다.
 
 - [ ] **Step 6: 관계도 갱신** — `docs/diagrams/homelab-application-platform.drawio`(mxGraph XML)를 수정한다.
   - 기존 하네스 영역 근처, 위쪽 운영자 작업 줄에 상자 세 개를 추가한다: `앱 개발 에이전트`(사람 대리), `배포 요청 API`(k3s 서비스), `워크로드 적용 job`(GitHub Actions). 기존 상자 스타일을 복사해 쓴다.

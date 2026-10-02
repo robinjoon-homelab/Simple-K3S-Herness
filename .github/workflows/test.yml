@@ -1,0 +1,31 @@
+name: 하네스와 문서 검사
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      REQUIRE_HELM: "1"
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Python 준비
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - name: Helm 준비
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.0.5
+      - name: 문서 링크 검사
+        run: python3 tools/check_docs.py
+      - name: 하네스 테스트
+        run: python3 -m unittest discover -s tests
