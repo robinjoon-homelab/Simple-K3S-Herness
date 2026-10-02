@@ -1,6 +1,6 @@
-# 배포 요청 API 설계
+# 배포 요청 API 설계 (보관)
 
-상태: 설계 합의, 구현 전. 작성일: 2026-09-26.
+2026-09-26에 합의한 설계를 2026-10-03에 보관했다. 당시의 선택지와 버린 대안을 남기려는 기록이며 현재 계약이 아니다. 지금 동작은 [배포 요청 API 계약](../../contracts/deploy-api.md)이, 운영은 [운영 절차](../../runbooks/deploy-api.md)가 정한다. 실제 확인 결과는 [검증 기록](../../records/deploy-api.md)에 있다. 이 설계로 작성한 구현 계획은 저장소에서 지웠고 [마지막 수정본](https://github.com/robinjoon-homelab/Simple-K3S-Herness/blob/6f754da22f2e306734010b4919cc777e8c4cd3cd/docs/superpowers/plans/2026-09-26-deploy-request-api.md)에서 볼 수 있다.
 
 ## 1. 배경과 목표
 
@@ -15,19 +15,10 @@
 
 ## 2. 구조
 
-```text
-앱 에이전트 (종류 무관)
-  │ Authorization: Bearer <GitHub 토큰, 예: gh auth token>
-  ▼
-배포 요청 API 서버 (k3s)
-  │ 조회: GitHub API로 하네스 main의 파일을 직접 읽음
-  │ 생성·수정: 호출자 토큰으로 하네스 workflow 트리거
-  ▼
-하네스 GitHub Actions: apply-workload.yml
-  │ platform.py create / patch → commit/push → 결과 기록
-  ▼
-Argo CD → 공통 Helm Chart → k3s
-```
+1. 앱 에이전트(종류 무관)가 GitHub 토큰(예: `gh auth token`)을 `Authorization: Bearer`로 보내 k3s의 배포 요청 API 서버를 호출한다.
+2. 서버는 조회 요청을 GitHub API로 하네스 `main`의 파일을 직접 읽어 처리하고, 생성·수정 요청은 호출자 토큰으로 하네스 workflow를 트리거한다.
+3. 하네스 GitHub Actions의 `apply-workload.yml`이 `platform.py create`·`patch`를 실행하고 커밋·push한 뒤 결과를 기록한다.
+4. Argo CD가 공통 Helm Chart로 렌더링해 k3s에 적용한다.
 
 | 구성 요소 | 하는 일 | 하지 않는 일 |
 | --- | --- | --- |
@@ -115,7 +106,7 @@ Content-Type: application/json
 
 ### 4.3 사용 안내 `GET /`
 
-하네스 레포 `server/guide.md`를 서버 주소만 치환해 제공한다. 내용:
+하네스 레포 `server/deploy_api/guide.md`를 서버 주소만 치환해 제공한다. 내용:
 
 - 인증: `gh auth token` 값을 Bearer 토큰으로 보낸다.
 - 흐름: `GET /v1/schema` → `GET /v1/apps/{name}` → `POST` 또는 `PATCH` → `GET /v1/runs/{runId}` 폴링.

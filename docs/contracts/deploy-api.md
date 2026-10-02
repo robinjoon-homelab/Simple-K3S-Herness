@@ -1,6 +1,6 @@
 # 배포 요청 API
 
-앱 레포에서 일하는 에이전트가 하네스 워크로드를 조회·생성·수정하는 HTTP 창구다. 에이전트용 사용 안내는 서버의 `GET /`가 제공하며 원본은 [`server/deploy_api/guide.md`](../../server/deploy_api/guide.md)다. 이 문서는 운영자와 하네스 개발자를 위한 외부 계약과 운영 조건을 설명한다. 설계 배경은 [설계 spec](../superpowers/specs/2026-09-26-deploy-request-api-design.md)에 있다.
+앱 레포에서 일하는 에이전트가 하네스 워크로드를 조회·생성·수정하는 HTTP 창구다. 에이전트용 사용 안내는 서버의 `GET /`가 제공하며 원본은 [`server/deploy_api/guide.md`](../../server/deploy_api/guide.md)다. 이 문서는 운영자와 하네스 개발자를 위한 외부 계약과 운영 조건을 설명한다. 설계 배경은 [설계 spec](../design/archive/2026-09-26-deploy-request-api.md)에 있다.
 
 ## 역할과 경계
 
