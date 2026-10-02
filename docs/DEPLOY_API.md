@@ -1,6 +1,6 @@
 # 배포 요청 API
 
-상태: 첫 이미지 발행과 `deploy-api` 워크로드 등록 완료(2026-10-02). DNS 연결과 운영 확인 전. 작성일: 2026-09-26.
+상태: 운영 중. `deploy-api` 배포와 실제 토큰 운영 확인 완료(2026-10-02). 작성일: 2026-09-26.
 
 앱 레포에서 일하는 에이전트가 하네스 워크로드를 조회·생성·수정하는 HTTP 창구다. 에이전트용 사용 안내는 서버의 `GET /`가 제공하며 원본은 [`server/deploy_api/guide.md`](../server/deploy_api/guide.md)다. 이 문서는 운영자와 하네스 개발자를 위한 외부 계약과 운영 조건을 설명한다. 설계 배경은 [설계 spec](superpowers/specs/2026-09-26-deploy-request-api-design.md)에 있다.
 
@@ -77,7 +77,7 @@ workflow 안에서 CLI가 실패한 경우는 HTTP 오류가 아니라 결과의
 
 1. SMS OIDC 허용 정책에 이 레포의 `.github/workflows/build-deploy-api.yml`(`main`)을 추가한다.
 2. 첫 빌드로 이미지를 push한다. 워크로드가 아직 없으므로 릴리스는 건너뛴다.
-3. `deploy.homelab.robinjoon.xyz` DNS를 Traefik 진입점으로 연결한다.
+3. `deploy.homelab.robinjoon.xyz`가 Traefik 진입점을 가리켜야 한다. 기존 `*.homelab.robinjoon.xyz` 와일드카드 레코드로 충족되어 별도 레코드는 만들지 않았다.
 4. CLI로 `deploy-api`를 등록한다. 컨테이너 포트 `http:8080`, env `DEPLOY_API_BASE_URL`, `imagePullSecrets: registry-credentials`, Service `web` 80→`http`, Ingress `deploy.homelab.robinjoon.xyz`(`tls.mode: cert-manager`).
 
 ## 운영 확인
@@ -90,3 +90,9 @@ workflow 안에서 CLI가 실패한 경우는 HTTP 오류가 아니라 결과의
 
 | 날짜 | 확인 항목 | 결과 | 링크 |
 | --- | --- | --- | --- |
+| 2026-10-02 | SMS 허용 정책 추가 후 첫 이미지 발행 | 성공. 두 번째 시도는 buildx push 중 runner DNS 조회 실패, 세 번째 재실행 성공. 워크로드 미등록으로 릴리스는 건너뜀 | [run](https://github.com/robinjoon-homelab/Simple-K3S-Herness/actions/runs/37000388392) |
+| 2026-10-02 | `deploy-api` 등록 후 Argo CD 동기화 | Synced/Healthy, Pod 1/1, Certificate Ready. `/healthz` 200, 토큰 없는 `/v1/apps` 401, HTTP→HTTPS 308 | 커밋 `9123666` |
+| 2026-10-02 | 실제 `gh auth token`으로 조회 | `/v1/apps` 목록, `notion-blog` 조회 본문이 `main`과 같고 ETag가 `git hash-object`와 일치, 없는 앱 404, 스키마 공개 조회 | — |
+| 2026-10-02 | 변경 없는 PATCH(`notion-blog`, `{"values": {}}`) | `unchanged`, `main` 커밋 없음 | [run](https://github.com/robinjoon-homelab/Simple-K3S-Herness/actions/runs/37006404810) |
+| 2026-10-02 | 낡은 `If-Match`·`If-Match` 없는 PATCH | 서버 사전 확인에서 409 `conflict`, 428 `precondition_required`. workflow 미실행 | — |
+| 2026-10-02 | 스키마 위반 PATCH(`replicas: "many"`) | `failed`와 Helm lint 메시지 전달, 적용 단계에서 실패해 커밋·push 건너뜀 | [run](https://github.com/robinjoon-homelab/Simple-K3S-Herness/actions/runs/37006469648) |
