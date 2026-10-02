@@ -4,7 +4,7 @@
 
 ## 인증
 
-`GET /`, `GET /v1/schema`, `GET /healthz`를 제외한 요청에 GitHub 토큰을 보냅니다. 하네스 레포 Actions 실행 권한이 있어야 생성·수정할 수 있습니다.
+`GET /`, `GET /v1/schema`, `GET /healthz`, `GET /openapi.json`을 제외한 요청에 GitHub 토큰을 보냅니다. 하네스 레포 Actions 실행 권한이 있어야 생성·수정할 수 있습니다.
 
 ```bash
 TOKEN="$(gh auth token)"

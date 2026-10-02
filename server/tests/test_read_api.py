@@ -22,7 +22,7 @@ class ReadApiTest(unittest.TestCase):
         self.assertTrue(response.headers["content-type"].startswith("text/markdown"))
         self.assertIn(f"{BASE_URL}/v1/apps", response.text)
         self.assertNotIn("{{BASE_URL}}", response.text)
-        for path in ("/v1/schema", "/v1/apps/{name}", "/v1/runs/{runId}", "If-Match"):
+        for path in ("/v1/schema", "/v1/apps/{name}", "/v1/runs/{runId}", "If-Match", "/openapi.json"):
             self.assertIn(path, response.text)
 
     def test_health_and_schema_are_public(self):
