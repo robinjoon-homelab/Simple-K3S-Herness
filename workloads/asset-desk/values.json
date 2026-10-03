@@ -12,7 +12,7 @@
         "name": "app",
         "image": {
           "repository": "registry.homelab.robinjoon.xyz/apps/asset-desk",
-          "tag": "sha-ec6fcb5f495b9577a7116a047910831a0e11b1aa-run-37127002185-1"
+          "tag": "sha-a41174059b0b4e220639769a9d4f81b4dfe8aeb3-run-37130659247-1"
         },
         "ports": [
           {
