@@ -12,7 +12,7 @@
         "name": "app",
         "image": {
           "repository": "registry.homelab.robinjoon.xyz/apps/deploy-api",
-          "tag": "sha-be3674976e149bbbd06698073c942e9829b20189-run-37000388392-3"
+          "tag": "sha-22c49e5ad8737aa1c1abe08522a1b3ba85656992-run-37093656180-1"
         },
         "ports": [
           {
