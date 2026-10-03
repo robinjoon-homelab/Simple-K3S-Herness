@@ -32,7 +32,7 @@ CI와 앱 실행용 비밀은 다음처럼 구분한다.
 | 작업 | 먼저 읽을 문서 |
 | --- | --- |
 | 전체 관계·책임 경계 확인 | [전체 설계](docs/architecture/system.md) |
-| 앱 추가·배포 구성 수정 | [워크로드 스킬](skills/homelab-k3s-workloads/SKILL.md), [워크로드 계약](docs/contracts/workload.md) |
+| 앱 추가·배포 구성 수정 | [워크로드 스킬](.agents/skills/homelab-k3s-workloads/SKILL.md), [워크로드 계약](docs/contracts/workload.md) |
 | 하네스 CLI·Chart·공통 인프라 자체 개발 | [워크로드 계약](docs/contracts/workload.md), [테스트](docs/development/testing.md), 해당 [운영 절차](docs/README.md#운영-절차) |
 | 공용 Traefik HTTPS·HSTS 정책 | [정책 적용과 확인](docs/runbooks/traefik-https.md) |
 | 홈 네트워크 VPN 설치·인증·접속 확인 | [VPN 운영 절차](docs/runbooks/vpn.md) |

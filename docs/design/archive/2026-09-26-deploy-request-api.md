@@ -4,7 +4,7 @@
 
 ## 1. 배경과 목표
 
-지금은 워크로드를 만들거나 바꾸려면 하네스 레포를 클론한 환경에서 [워크로드 스킬](../../../skills/homelab-k3s-workloads/SKILL.md)을 읽고 `tools/platform.py`를 실행한 뒤 커밋·push해야 한다. 앱 개발은 각 앱 레포에서 일어나므로 앱을 개발하는 에이전트는 이 규약을 알 수 없다.
+지금은 워크로드를 만들거나 바꾸려면 하네스 레포를 클론한 환경에서 [워크로드 스킬](../../../.agents/skills/homelab-k3s-workloads/SKILL.md)을 읽고 `tools/platform.py`를 실행한 뒤 커밋·push해야 한다. 앱 개발은 각 앱 레포에서 일어나므로 앱을 개발하는 에이전트는 이 규약을 알 수 없다.
 
 목표:
 

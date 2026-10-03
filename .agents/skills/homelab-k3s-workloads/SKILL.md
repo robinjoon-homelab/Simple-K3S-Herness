@@ -5,7 +5,9 @@ description: >
   this homelab K3s GitOps repository using the flat tools/platform.py CLI.
   Use for supported containers, private registry Secret references, ConfigMaps,
   environment variables, Secret references, volumes, Services, Ingress,
-  cert-manager TLS and shared database names.
+  cert-manager TLS and shared database names. Do not use it from an app
+  repository (use the deploy request API) or for harness development such as
+  changing the CLI, Chart or infrastructure.
 ---
 
 # 워크로드 구성 스킬
@@ -23,8 +25,8 @@ description: >
 - 공식 워크로드는 Deployment이다.
 - 기존 registry Secret 이름을 `workload.imagePullSecrets`로 참조할 수 있다. 인증 정보나 Secret 자체는 생성하지 않는다.
 - ConfigMap, 환경변수, Secret/ConfigMap 참조, 볼륨과 마운트, Service, Ingress, cert-manager Certificate를 지원한다.
-- Ingress를 선언하면 `tls.mode: cert-manager`가 필수이며 Ingress class는 `traefik`이다. 공통 Chart는 `websecure`의 HTTPS Ingress와 Certificate를 만들고, 공용 `traefik-policy`가 HTTP→HTTPS 전환과 HSTS를 적용한다. 앱별 HTTP Ingress나 Middleware는 만들지 않는다. Ingress 없는 앱은 허용한다. Traefik 사전 조건은 [워크로드 HTTPS 계약](../../docs/contracts/workload.md#워크로드-https-계약)을 확인한다.
-- 앱 저장소에서 작업하는 에이전트는 이 스킬 대신 [배포 요청 API](../../docs/contracts/deploy-api.md)를 사용한다.
+- Ingress를 선언하면 `tls.mode: cert-manager`가 필수이며 Ingress class는 `traefik`이다. 공통 Chart는 `websecure`의 HTTPS Ingress와 Certificate를 만들고, 공용 `traefik-policy`가 HTTP→HTTPS 전환과 HSTS를 적용한다. 앱별 HTTP Ingress나 Middleware는 만들지 않는다. Ingress 없는 앱은 허용한다. Traefik 사전 조건은 [워크로드 HTTPS 계약](../../../docs/contracts/workload.md#워크로드-https-계약)을 확인한다.
+- 앱 저장소에서 작업하는 에이전트는 이 스킬 대신 [배포 요청 API](../../../docs/contracts/deploy-api.md)를 사용한다.
 - DB는 공유 `shared-db` Cluster와 공유 `defaultuser`를 사용하며 `--db-name`은 논리적 database 이름을 분리하고 모든 컨테이너에 올바른 FQDN의 `DB_HOST`를 자동 주입한다.
 
 ## 금지 사항
