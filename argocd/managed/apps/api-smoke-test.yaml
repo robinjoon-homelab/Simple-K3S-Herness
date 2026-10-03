@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: api-smoke-test
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab-workloads
+  source:
+    repoURL: https://github.com/robinjoon-homelab/Simple-K3S-Herness.git
+    targetRevision: main
+    path: chart
+    helm:
+      releaseName: api-smoke-test
+      valueFiles:
+        - ../platform/defaults.json
+        - ../workloads/api-smoke-test/values.json
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: api-smoke-test
+  syncPolicy:
+    managedNamespaceMetadata:
+      labels:
+        simple-k3s-harness.dev/workload: "true"
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
