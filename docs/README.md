@@ -42,8 +42,13 @@
 - [테스트](development/testing.md): 로컬 테스트와 CI
 - [문서 작성 규칙](development/documentation.md): 문서 배치, 문체, 용어, 확인 목록
 
+## 진행 중 설계
+
+- [남은 개선 과제](design/active/2026-10-03-followups.md) (2026-10-03)
+
 ## 지난 설계
 
 구현을 마치고 보관한 설계다. 현재 계약이 아니다.
 
 - [배포 요청 API 설계](design/archive/2026-09-26-deploy-request-api.md) (2026-09-26)
+- [문서 구조 개편 합의안](design/archive/2026-10-03-docs-restructure.md) (2026-10-03)
