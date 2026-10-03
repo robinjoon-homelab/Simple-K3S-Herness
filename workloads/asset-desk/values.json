@@ -1,0 +1,186 @@
+{
+  "contractVersion": 1,
+  "metadata": {
+    "name": "asset-desk",
+    "namespace": "asset-desk"
+  },
+  "workload": {
+    "kind": "deployment",
+    "replicas": 1,
+    "containers": [
+      {
+        "name": "app",
+        "image": {
+          "repository": "registry.homelab.robinjoon.xyz/apps/asset-desk",
+          "tag": "sha-39815629987d1bb1de0f42a48bd773fa4b0d922f-run-37126595545-1"
+        },
+        "ports": [
+          {
+            "name": "http",
+            "containerPort": 8080
+          }
+        ],
+        "env": [
+          {
+            "name": "DB_PORT",
+            "secretKeyRef": {
+              "name": "shared-db-app",
+              "key": "port"
+            }
+          },
+          {
+            "name": "DB_NAME",
+            "value": "asset_desk"
+          },
+          {
+            "name": "DB_USERNAME",
+            "secretKeyRef": {
+              "name": "shared-db-app",
+              "key": "username"
+            }
+          },
+          {
+            "name": "DB_PASSWORD",
+            "secretKeyRef": {
+              "name": "shared-db-app",
+              "key": "password"
+            }
+          },
+          {
+            "name": "SAMPLE_ENABLED",
+            "value": "false"
+          },
+          {
+            "name": "TOSS_ENABLED",
+            "value": "true"
+          },
+          {
+            "name": "KIS_ENABLED",
+            "value": "true"
+          },
+          {
+            "name": "LOGIN_USERNAME",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "LOGIN_USERNAME"
+            }
+          },
+          {
+            "name": "LOGIN_PASSWORD",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "LOGIN_PASSWORD"
+            }
+          },
+          {
+            "name": "TOSS_CLIENT_ID",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "TOSS_CLIENT_ID"
+            }
+          },
+          {
+            "name": "TOSS_CLIENT_SECRET",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "TOSS_CLIENT_SECRET"
+            }
+          },
+          {
+            "name": "KIS_APP1_KEY",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "KIS_APP1_KEY"
+            }
+          },
+          {
+            "name": "KIS_APP1_SECRET",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "KIS_APP1_SECRET"
+            }
+          },
+          {
+            "name": "KIS_APP2_KEY",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "KIS_APP2_KEY"
+            }
+          },
+          {
+            "name": "KIS_APP2_SECRET",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "KIS_APP2_SECRET"
+            }
+          },
+          {
+            "name": "KIS_APP3_KEY",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "KIS_APP3_KEY"
+            }
+          },
+          {
+            "name": "KIS_APP3_SECRET",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "KIS_APP3_SECRET"
+            }
+          },
+          {
+            "name": "KIS_ACCOUNTS",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "KIS_ACCOUNTS"
+            }
+          },
+          {
+            "name": "TZ",
+            "value": "Asia/Seoul"
+          }
+        ]
+      }
+    ],
+    "imagePullSecrets": [
+      {
+        "name": "registry-credentials"
+      }
+    ]
+  },
+  "database": {
+    "name": "asset_desk"
+  },
+  "services": [
+    {
+      "name": "web",
+      "ports": [
+        {
+          "name": "http",
+          "port": 80,
+          "targetPort": "http"
+        }
+      ]
+    }
+  ],
+  "ingresses": [
+    {
+      "name": "public",
+      "service": "web",
+      "rules": [
+        {
+          "host": "asset-desk.homelab.robinjoon.xyz",
+          "paths": [
+            {
+              "path": "/",
+              "servicePort": "http"
+            }
+          ]
+        }
+      ],
+      "tls": {
+        "mode": "cert-manager"
+      }
+    }
+  ]
+}
