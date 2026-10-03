@@ -27,4 +27,12 @@
 2. 기존 앱에 변경 없는 `PATCH`를 보내면 결과가 `unchanged`이고 커밋이 생기지 않는다.
 3. 잘못된 `PATCH`를 보내면 결과가 `failed`와 CLI 메시지이고 커밋이 생기지 않는다.
 
-삭제 기능이 없으므로 실제 생성(`POST`)은 운영 점검에서 하지 않고 첫 실제 앱을 온보딩할 때 확인한다.
+## 생성 시험과 정리
+
+API에는 삭제 기능이 없다. 생성(`POST`)까지 시험하려면 외부 이미지 대신 레지스트리에 이미 있는 이미지로 Service·Ingress 없는 시험 앱을 만들고, 확인한 뒤 다음 순서로 정리한다.
+
+1. `workloads/<app>/values.json`과 `argocd/managed/apps/<app>.yaml`을 지우는 커밋을 원격 `main`에 push한다.
+2. Root Application이 prune으로 Application을 지우고, Application의 finalizer가 그 리소스를 함께 지운다. `kubectl -n argocd get application <app>`이 없어질 때까지 기다린다.
+3. Argo CD가 만든 네임스페이스는 prune 대상이 아니므로 `kubectl delete namespace <app>`으로 지운다. 복제된 Secret도 함께 사라진다.
+
+같은 절차는 실제 워크로드를 삭제할 때도 쓴다.
