@@ -16,6 +16,9 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Values.metadata.name | quote }}
     spec:
+      {{- with .Values.workload.serviceAccountName }}
+      serviceAccountName: {{ . | quote }}
+      {{- end }}
       {{- with .Values.workload.imagePullSecrets }}
       imagePullSecrets:
       {{- range . }}

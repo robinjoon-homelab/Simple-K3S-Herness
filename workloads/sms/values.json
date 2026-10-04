@@ -73,7 +73,8 @@
         "name": "registry-credentials"
       }
     ],
-    "volumes": []
+    "volumes": [],
+    "serviceAccountName": "sms-secret-manager"
   },
   "database": {
     "name": "secret_manage_system"

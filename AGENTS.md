@@ -23,7 +23,7 @@ CI와 앱 실행용 비밀은 다음처럼 구분한다.
 
 - `load-ci-secrets` Action은 **호출 앱의 GitHub-hosted runner job 안에서** 실행된다. GitHub OIDC로 호출 저장소의 실행 신원을 증명하고 `https://secrets.homelab.robinjoon.xyz`의 SMS에서 CI 자격증명을 조회해 같은 job의 후속 step에 환경변수로 전달한다. 별도 러너 인프라나 컨테이너 서버가 아니다.
 - SMS는 CI 값과 OIDC 허용 정책을 기존 공유 PostgreSQL에 저장한다. 운영자가 SMS UI·관리 API에서 직접 관리하며 하네스 배포 values에 정책을 넣지 않는다. 허용된 실행은 필요한 앱 이름(`zot`, `harness` 등)을 조회한다. 앱 이름은 권한 경계가 아니다. Organization 소속만으로 모든 실행이 허용되는 것도 아니다.
-- 배포된 앱은 기존 Kubernetes Secrets를 계속 사용한다. SMS가 Kubernetes Secrets를 생성·갱신하거나 CI 응답을 앱 Pod에 자동 전달하는 경로는 **없다**. SMS 자체 CI는 SMS 장애 중에도 배포할 수 있도록 GitHub Secrets를 유지한다.
+- 운영자는 SMS에서 모든 namespace의 일반 앱용 `Opaque` Kubernetes Secret을 조회·생성·수정한다. 실행용 값은 Kubernetes에만 저장하고 CI 조회에 포함하지 않는다. 전용 ServiceAccount의 클러스터 접근 권한은 하네스가 제공하며 대상·입력 제약은 SMS가 검사한다. 앱 재배포는 SMS의 역할이 아니다. SMS 자체 CI는 SMS 장애 중에도 배포할 수 있도록 GitHub Secrets를 유지한다.
 
 ## 작업별 문서
 

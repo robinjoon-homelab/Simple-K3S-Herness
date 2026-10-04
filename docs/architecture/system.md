@@ -18,7 +18,9 @@
 
 Secret Manage System(SMS)은 여러 앱 CI가 쓰는 자격증명을 한곳에 보관한다. 허용된 GitHub Actions 실행은 `load-ci-secrets` Action으로 필요한 값을 가져온다. 앱 이름은 값을 선택하는 구분이며 권한 경계가 아니다. 허용된 실행은 다른 앱 이름의 CI 자격증명도 조회할 수 있으므로 한 실행이 침해되면 보관된 CI 자격증명 전체가 영향을 받을 수 있다.
 
-SMS는 운영자의 CI 자격증명 관리와 허용된 CI의 조회를 담당한다. 운영자가 SMS에 직접 접속하며 하네스와 `load-ci-secrets` Action은 관리 API를 호출하지 않는다. SMS는 앱 실행용 Kubernetes Secret을 생성·등록·갱신하지 않는다. OpenBao, Spring Cloud Config Server, ARC, DinD 러너 인프라는 운영 범위에 포함하지 않는다.
+SMS는 운영자의 CI 자격증명 관리와 허용된 CI의 조회를 담당한다. 운영자는 같은 SMS에서 모든 namespace의 일반 앱용 `Opaque` Kubernetes Secret도 조회·생성·수정한다. 운영자가 SMS에 직접 접속하며 하네스와 `load-ci-secrets` Action은 관리 API를 호출하지 않는다. 실행용 값은 Kubernetes에만 저장하며 CI 조회로 제공하지 않는다. Secret을 사용하는 앱의 재배포는 SMS의 역할이 아니다.
+
+OpenBao, Spring Cloud Config Server, ARC, DinD 러너 인프라는 운영 범위에 포함하지 않는다.
 
 ## L1 — 시스템 관계
 
@@ -28,7 +30,7 @@ SMS는 운영자의 CI 자격증명 관리와 허용된 CI의 조회를 담당�
 | --- | --- | --- |
 | 운영자 | 배포 하네스 | 배포 설정 변경 |
 | 앱 개발 에이전트 | 배포 하네스 | 배포 요청 API로 워크로드 조회·생성·수정 |
-| 운영자 | Secret Manage System | 직접 웹 UI에 접속해 CI 자격증명 관리 |
+| 운영자 | Secret Manage System | 직접 웹 UI에 접속해 CI 자격증명과 앱 실행용 Secret 관리 |
 | 배포 하네스 | Secret Manage System | 선언된 SMS 구성 동기화 |
 | GitHub | Secret Manage System | 실행 신원을 제시하고 CI 값 요청 |
 | Secret Manage System | GitHub | 요청한 CI 자격증명 반환 |
@@ -39,6 +41,7 @@ SMS는 운영자의 CI 자격증명 관리와 허용된 CI의 조회를 담당�
 | zot | 각 앱 | 배포 이미지 제공 |
 | zot | Secret Manage System | SMS 이미지 제공 |
 | Secret Manage System | 공유 PostgreSQL | CI 자격증명 저장·조회 |
+| Secret Manage System | Kubernetes Secrets | 일반 앱용 텍스트 `Opaque` Secret 조회·생성·수정 |
 | 각 앱 | 공유 PostgreSQL | 앱 실행 데이터 저장·조회 |
 
 ## L2 — 실행 단위와 저장소
@@ -60,13 +63,15 @@ SMS는 운영자의 CI 자격증명 관리와 허용된 CI의 조회를 담당�
 
 소스 저장소는 `robinjoon-homelab`에서 관리한다. 하네스와 Notion-Blog는 공개, SMS는 비공개 저장소다. 하네스는 공통 배포 도구와 Action을, 별도 비공개 `Secret-Manager-System` 저장소는 SMS 구현을, 각 앱 저장소는 앱 코드와 CI를 소유한다. SMS의 CI 자격증명과 OIDC 허용 정책은 PostgreSQL에 저장하며 운영자가 SMS에서 직접 관리한다. OIDC 정책은 하네스의 워크로드 values에 넣지 않는다.
 
+앱 실행용 값은 Kubernetes Secret에만 저장한다. 하네스는 SMS 전용 ServiceAccount와 클러스터 전체 Secret 조회·생성·수정 권한을 제공하고, 대상·입력 제약은 SMS에서 검사한다. 구체적인 접근 구성은 [SMS 외부 계약](../contracts/sms.md#kubernetes-secret-접근-권한)을 따른다.
+
 ## 주요 흐름과 책임 경계
 
 1. 운영자는 SMS 웹 UI에 직접 접속해 원래 발급받은 CI 자격증명을 등록·교체·삭제한다. SMS가 관리 API와 저장을 담당하며 하네스·`load-ci-secrets` Action은 관리 API를 호출하지 않는다. CI 값의 발급과 입력은 별개이며, GitHub에 저장된 Secret의 평문을 API로 다시 읽어오는 방식은 사용하지 않는다.
 2. 허용된 앱 CI job에서 `load-ci-secrets` Action이 GitHub의 실행 신원을 받아 SMS에 제시한다. 그 신원은 Action 코드가 있는 하네스가 아니라 호출한 앱의 실행을 나타낸다.
 3. SMS는 실행을 허용할지 판단한 뒤 요청한 앱 이름의 값을 반환한다. `load-ci-secrets` Action은 이를 같은 job의 후속 step에 전달한다.
 4. 앱 CI는 받은 값으로 zot에 이미지를 발행하고 기존 하네스 릴리스 워크플로를 호출한다. 하네스가 Git의 이미지 태그를 변경하면 Argo CD가 앱을 동기화한다.
-5. 배포된 앱은 기존 Kubernetes Secret 참조와 공유 DB 접속 방식을 계속 사용한다. CI에서 받은 값을 새 Kubernetes Secret으로 만들거나 앱 Pod에 자동 주입하지 않는다.
+5. 운영자는 SMS에서 namespace와 Secret 이름을 지정해 실행용 텍스트 값을 생성·수정한다. SMS가 Kubernetes API에 직접 저장하며 앱 재배포는 수행하지 않는다. 배포된 앱은 기존 Kubernetes Secret 참조와 공유 DB 접속 방식을 계속 사용한다. CI에서 받은 값을 새 Kubernetes Secret으로 만들거나 앱 Pod에 자동 주입하지 않는다.
 6. 배포 계약의 생성·수정은 두 경로로 한다. 운영자나 하네스 안의 에이전트는 구성 CLI로 파일을 바꾸고 직접 Git에 반영한다. 앱 저장소의 에이전트는 GitHub 토큰으로 배포 요청 API를 호출한다. API는 호출자 토큰으로 하네스 Git을 조회하고 워크로드 적용 워크플로를 실행하며, 그 job 안의 CLI가 파일을 바꾸어 커밋한다. 이후 Argo CD가 4번과 같은 방식으로 동기화한다.
 
 공통 값은 값을 제공하는 시스템 이름으로 한 번 보관한다. 예를 들어 노션 블로그 CI는 레지스트리용 값과 하네스 호출용 값을 각각 조회한다. 이를 각 소비 앱 이름 아래에 반복 복사할 필요가 없다.
@@ -77,6 +82,7 @@ SMS는 운영자의 CI 자격증명 관리와 허용된 CI의 조회를 담당�
 - SMS는 단일 인스턴스로 운영하며 기존 공유 PostgreSQL의 `secret_manage_system` 논리 DB를 사용한다. 별도 DB 인스턴스·계정·고가용성·자동 장애조치는 추가하지 않는다. 구체적인 저장 계약은 [SMS 외부 계약](../contracts/sms.md)을 따른다.
 - 앱 CI에서 SMS와 zot 양쪽으로 접속 가능해야 한다. OIDC와 네트워크 연결은 별개이며, 한쪽만 연결됐다고 전체 배포가 가능하지는 않다. SMS는 HTTPS를 사용한다. 홈 LAN VPN은 Tailscale 서브넷 라우터를 별도 인프라 앱으로 선언하며 OIDC를 대체하지 않는다. 이 VPN은 개인 기기의 홈 LAN 접근용이다. 기존 GitHub-hosted runner의 공개 접근 경로를 VPN으로 전환하는 작업은 포함하지 않는다.
 - SMS 자체 CI는 서비스 중단 중에도 SMS를 배포할 수 있도록 GitHub Secrets를 유지한다. SMS를 사용하는 소비 앱 CI와 이 예외를 구분한다.
+- SMS나 Kubernetes API가 중단되면 SMS를 통한 실행용 Secret 관리가 실패한다. 이미 저장된 Kubernetes Secret과 이를 사용하는 앱은 SMS의 실행에 의존하지 않는다.
 - SMS나 DB가 중단되면 새로운 CI 값 조회가 실패한다. 이미 실행 중인 앱은 이 서비스에 의존하지 않는다. 같은 job이 이미 받은 정적 자격증명이 서비스 중단만으로 무효화되지는 않는다.
 - 공유 DB 자격증명을 가진 신뢰된 앱과 클러스터 관리자는 저장된 CI 값을 직접 읽고 변경·삭제할 수 있다. 앱 간 격리를 줄이더라도 외부 접근 인증이나 비밀 값의 Git·로그 노출 방지는 유지한다.
 

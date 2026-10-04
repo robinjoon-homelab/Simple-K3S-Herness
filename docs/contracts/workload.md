@@ -39,6 +39,8 @@ Chart가 계약에 따라 다음 리소스를 렌더링한다.
 
 워크로드 계약에는 컨테이너 이미지/포트, replicas, 기존 registry Secret을 가리키는 `imagePullSecrets`, 환경변수와 ConfigMap·Secret 참조, 볼륨·마운트, 서비스·Ingress·TLS, 논리적 database 이름이 포함된다. Database 워크로드의 `DB_HOST`는 플랫폼 예약 이름이며 워크로드 values에서 직접 정의할 수 없다. StatefulSet, DaemonSet, CronJob, 임의 raw manifest, existing-secret TLS 모드는 공식 계약이 아니다.
 
+`workload.serviceAccountName`은 선택 항목이며 같은 namespace에 이미 존재하는 ServiceAccount 이름을 받는다. 생략하면 Kubernetes 기본 ServiceAccount를 사용한다. Chart는 ServiceAccount나 RBAC를 만들지 않으며 필요한 권한은 별도 인프라 선언으로 관리한다. SMS의 연결은 [SMS 외부 계약](sms.md#kubernetes-secret-접근-권한)을 따른다.
+
 `imagePullSecrets`는 Secret 이름만 받는다. 레지스트리 사용자 이름, 비밀번호, 토큰은 values에 저장하지 않으며, 워크로드는 Reflector가 미리 복제한 `registry-credentials` Secret의 이름만 참조한다.
 
 ### 워크로드 HTTPS 계약

@@ -6,9 +6,9 @@ CI 조회 API·배포 입력·운영자 직접 관리 경로가 유지된다면 
 
 ## 1. 책임과 검증 기준
 
-SMS는 CI 자격증명을 보관하고, GitHub Actions의 실행 신원을 확인한 뒤 요청한 앱 이름의 값을 반환한다. 운영자에게는 값을 등록·교체·삭제하는 관리 API와 템플릿엔진 기반의 간단한 웹 UI를 제공한다. 운영자가 SMS에 직접 접속하며 하네스와 `load-ci-secrets` Action은 관리 API를 호출하지 않는다. UI와 관리 API의 상세 설계는 SMS 구현 저장소가 소유한다.
+SMS는 CI 자격증명을 보관하고, GitHub Actions의 실행 신원을 확인한 뒤 요청한 앱 이름의 값을 반환한다. 운영자에게는 CI 값을 등록·교체·삭제하고 Kubernetes의 일반 앱용 `Opaque` Secret을 조회·생성·수정하는 관리 API와 템플릿엔진 기반의 웹 UI를 제공한다. 운영자가 SMS에 직접 접속하며 하네스와 `load-ci-secrets` Action은 관리 API를 호출하지 않는다. UI와 관리 API의 상세 설계는 SMS 구현 저장소가 소유한다.
 
-**앱 간 격리는 최소화한다.** CI 조회 진입이 허용된 모든 저장소는 등록된 모든 앱 이름을 조회할 수 있다. 앱 이름은 조회 키이며 저장소·namespace·권한 경계가 아니다. 앱별 ACL, CI용 쓰기 API, GitHub job의 DB 쓰기, Kubernetes 앱 실행용 Secret 등록·조회·갱신은 제공하지 않는다. 운영자 관리 권한은 CI 조회 권한과 구분한다.
+**앱 간 격리는 최소화한다.** CI 조회 진입이 허용된 모든 저장소는 등록된 모든 앱 이름을 조회할 수 있다. 앱 이름은 조회 키이며 저장소·namespace·권한 경계가 아니다. 앱별 ACL, CI용 쓰기 API, GitHub job의 DB 쓰기는 제공하지 않는다. Kubernetes 실행용 값은 CI 조회 API에 포함하지 않는다. 운영자 관리 권한은 CI 조회 권한과 구분한다.
 
 | ID | 검증 기준 |
 | --- | --- |
@@ -16,7 +16,7 @@ SMS는 CI 자격증명을 보관하고, GitHub Actions의 실행 신원을 확�
 | S2 | 앱 이름별 JSON 구조와 오류가 모호하지 않고 모든 허용 저장소에 같은 조회 권한을 적용한다. |
 | S3 | CI OIDC 조회와 운영자 관리 인증을 구분하고 비밀을 로그·오류에 남기지 않는다. |
 | S4 | 하네스가 제공할 DB·접속 설정과 SMS가 소유할 저장·관리 책임을 구분한다. |
-| S5 | 공유 계정과 평문 저장의 신뢰 경계를 유지하고 앱 실행용 Secret 관리나 소비 앱의 CI 구현을 포함하지 않는다. |
+| S5 | CI 값과 Kubernetes 실행용 값을 분리하고, Secret 관리에 앱 재배포나 소비 앱의 CI 구현을 포함하지 않는다. |
 
 ## 2. 데이터와 조회 API v1
 
@@ -135,7 +135,21 @@ SMS 애플리케이션이 관리 API와 서버에서 HTML을 렌더링하는 템
 
 관리 UI와 API는 운영자 인증을 요구한다. 인증 방식과 운영자 등록 방법은 SMS에서 정하며, GitHub Actions OIDC 토큰만으로는 관리 기능에 접근할 수 없다. 브라우저의 쿠키·세션 인증을 사용하는 쓰기 요청은 CSRF로 인한 변경을 막아야 한다. 이 문서는 인증 라이브러리나 세션 구현을 지정하지 않는다. [Spring의 브라우저 요청 CSRF 보호](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html)
 
-입력한 값은 공통 데이터 규약을 충족해야 하며 잘못된 입력은 저장하지 않는다. 비밀을 포함하는 관리 화면·API 응답에는 `no-store`를 적용하고 입력 값·인증 정보는 URL·로그·오류에 남기지 않는다. 값을 관리하는 동안에도 CI 조회 API는 규약을 만족하는 완전한 앱 객체를 반환하거나 오류로 실패해야 하며 일부 값만 반영된 응답을 보내지 않는다. SMS에는 Kubernetes Secret을 조작할 권한이 필요하지 않다.
+입력한 CI 값은 공통 데이터 규약을 충족해야 하며 잘못된 입력은 저장하지 않는다. 비밀을 포함하는 관리 화면·API 응답에는 `no-store`를 적용하고 입력 값·인증 정보는 URL·로그·오류에 남기지 않는다. 값을 관리하는 동안에도 CI 조회 API는 규약을 만족하는 완전한 앱 객체를 반환하거나 오류로 실패해야 하며 일부 값만 반영된 응답을 보내지 않는다. CI 데이터 검증 규약은 Kubernetes Secret 입력에 적용하지 않는다.
+
+### Kubernetes Secret 관리
+
+운영자는 namespace를 선택한 뒤 Secret 이름과 텍스트 키·값 목록을 입력한다. SMS는 모든 namespace를 대상으로 일반 앱용 `Opaque` Secret을 조회·생성·수정한다. 입력·타입과 수정 대상의 제약은 애플리케이션에서 검사하며 namespace별 RBAC로 나누지 않는다. UI와 API는 기존 운영자 인증과 CSRF 보호를 적용한다.
+
+실행용 값은 Kubernetes API에 직접 저장한다. PostgreSQL의 CI 데이터와 분리하며 CI 조회 API로 제공하지 않는다. 수정 화면은 현재 키·값을 불러오고 저장 시 입력한 전체 키·값으로 교체한다. 화면에서 빠진 키는 삭제한다. 조회 당시 `resourceVersion`과 현재 버전이 다르면 덮어쓰지 않고 충돌을 알린다. 기존 Secret과 이름이 같은 생성 요청도 충돌로 처리한다.
+
+범위는 UTF-8 텍스트 값을 가진 변경 가능한 `Opaque` Secret의 관리다. `immutable: true`인 Secret의 수정은 거부한다. Secret 자체 삭제, 다른 Secret 타입, 앱 재배포, 외부 계정·토큰 발급이나 교체, 백업·복구와 별도 암호화 체계는 제공하지 않는다. Secret 저장 완료는 이를 사용하는 앱의 설정 반영 완료를 뜻하지 않는다.
+
+### Kubernetes Secret 접근 권한
+
+하네스의 `sms-secret-access` Argo CD Application은 `default` Project에서 `infrastructure/sms-secret-access/resources.yaml`을 동기화한다. 이 선언은 `sms` namespace의 `sms-secret-manager` ServiceAccount와 ClusterRole·ClusterRoleBinding을 관리한다. ClusterRole은 모든 namespace의 `secrets`에 `get`, `list`, `create`, `update`, `namespaces`에 `list`를 허용한다. Secret 삭제·워크로드 재배포 권한은 부여하지 않는다.
+
+SMS는 `workload.serviceAccountName: sms-secret-manager`로 이 계정을 사용한다. Kubernetes API 접속에는 Pod에 제공되는 ServiceAccount 토큰과 CA를 사용하며 kubeconfig나 관리자 자격증명을 values에 넣지 않는다. 일반 앱의 Chart는 기존 ServiceAccount 선택만 지원하며 이 권한을 다른 앱에 자동 부여하지 않는다.
 
 ### 평문 저장과 공유 계정의 경계
 
@@ -154,10 +168,13 @@ CI 자격증명은 **앱 수준에서 암호화하지 않고 평문으로 보관
 | 저장소 장애 또는 규약에 맞지 않는 저장 데이터 | 503 `SECRET_NOT_READY`; 일부 값이나 내부 접속 정보 노출 없음 |
 | 필요한 발급자 정보를 확보할 수 없어 신원을 검증할 수 없음 | 503 `IDENTITY_PROVIDER_UNAVAILABLE`; 검증을 생략한 성공 없음 |
 | 운영자가 웹 UI에서 유효한 더미 값을 등록·교체·삭제 | 하네스의 관리 API 호출 없이 완료되고, 이후 CI 조회에 변경 내용이 반영됨 |
-| 운영자가 데이터 규약에 맞지 않는 값을 입력 | 입력 거부, 기존 값 유지 |
+| 운영자가 데이터 규약에 맞지 않는 CI 값을 입력 | 입력 거부, 기존 값 유지 |
+| 운영자가 namespace를 선택해 텍스트 `Opaque` Secret 생성·수정 | 해당 namespace의 Kubernetes Secret에 반영되고 CI 데이터와 조회 응답은 유지됨 |
+| 같은 이름으로 Secret 생성 또는 오래된 `resourceVersion`으로 수정 | 충돌을 알리고 기존 값을 덮어쓰지 않음 |
+| 지원하지 않는 Secret 타입·텍스트가 아닌 값·변경 불가능한 Secret | 입력 또는 수정 거부, 기존 값 유지 |
 | 운영자 인증 없이 또는 CI OIDC 토큰만으로 관리 UI·API 접근 | 관리 기능을 사용할 수 없고 저장 값이 변경되지 않음 |
 | 브라우저의 인증을 악용한 CSRF 쓰기 요청 | 요청 거부, 저장 값이 변경되지 않음 |
 | 운영자가 값을 교체하는 동안 조회 | 변경 전·후의 완전한 객체 또는 명시적 오류; 일부 값만 섞인 응답 없음 |
 | 요청 제한 초과 | 429 `RATE_LIMITED`, 초 단위 `Retry-After` 제공 |
 
-CI 응답에는 공통 데이터 제약과 `no-store`를 적용하고, 조회·관리 어느 경로에서도 성공·실패와 무관하게 비밀이 로그에 노출되지 않아야 한다. 관리 UI·API의 상세 시험은 SMS 구현 저장소에서 정의한다. 이후 [`load-ci-secrets` Action의 통합 시험](load-ci-secrets.md)에서 같은 job의 환경변수 전달과 기존 릴리스 연동을 확인한다. 앱 실행용 Secret은 변경하지 않는다.
+CI 응답에는 공통 데이터 제약과 `no-store`를 적용하고, 조회·관리 어느 경로에서도 성공·실패와 무관하게 비밀이 로그에 노출되지 않아야 한다. 관리 UI·API의 상세 시험은 SMS 구현 저장소에서 정의한다. 이후 [`load-ci-secrets` Action의 통합 시험](load-ci-secrets.md)에서 같은 job의 환경변수 전달과 기존 릴리스 연동을 확인한다. 이 Action 통합 시험은 앱 실행용 Secret을 변경하지 않는다.
