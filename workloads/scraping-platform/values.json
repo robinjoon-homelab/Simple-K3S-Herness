@@ -1,0 +1,104 @@
+{
+  "contractVersion": 1,
+  "metadata": {
+    "name": "scraping-platform",
+    "namespace": "scraping-platform"
+  },
+  "workload": {
+    "kind": "deployment",
+    "replicas": 1,
+    "containers": [
+      {
+        "name": "app",
+        "image": {
+          "repository": "registry.homelab.robinjoon.xyz/apps/scraping-platform",
+          "tag": "sha-f8a514822e9958911b2c7db57871c6a16d720e85-run-37914599215-3"
+        },
+        "ports": [
+          {
+            "name": "http",
+            "containerPort": 8080
+          }
+        ],
+        "env": [
+          {
+            "name": "SPRING_PROFILES_ACTIVE",
+            "value": "prod"
+          },
+          {
+            "name": "DB_PORT",
+            "secretKeyRef": {
+              "name": "shared-db-app",
+              "key": "port"
+            }
+          },
+          {
+            "name": "SPRING_DATASOURCE_URL",
+            "value": "jdbc:postgresql://$(DB_HOST):$(DB_PORT)/scraping_platform"
+          },
+          {
+            "name": "SPRING_DATASOURCE_USERNAME",
+            "secretKeyRef": {
+              "name": "shared-db-app",
+              "key": "username"
+            }
+          },
+          {
+            "name": "SPRING_DATASOURCE_PASSWORD",
+            "secretKeyRef": {
+              "name": "shared-db-app",
+              "key": "password"
+            }
+          },
+          {
+            "name": "SCRAPING_API_TOKEN",
+            "secretKeyRef": {
+              "name": "scraping-platform-runtime",
+              "key": "api-token"
+            }
+          }
+        ]
+      }
+    ],
+    "imagePullSecrets": [
+      {
+        "name": "registry-credentials"
+      }
+    ]
+  },
+  "database": {
+    "name": "scraping_platform"
+  },
+  "services": [
+    {
+      "name": "web",
+      "ports": [
+        {
+          "name": "http",
+          "port": 80,
+          "targetPort": "http"
+        }
+      ]
+    }
+  ],
+  "ingresses": [
+    {
+      "name": "public",
+      "service": "web",
+      "rules": [
+        {
+          "host": "scraping-platform.homelab.robinjoon.xyz",
+          "paths": [
+            {
+              "path": "/",
+              "servicePort": "http"
+            }
+          ]
+        }
+      ],
+      "tls": {
+        "mode": "cert-manager"
+      }
+    }
+  ]
+}

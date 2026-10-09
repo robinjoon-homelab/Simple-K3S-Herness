@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: scraping-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab-workloads
+  source:
+    repoURL: https://github.com/robinjoon-homelab/Simple-K3S-Herness.git
+    targetRevision: main
+    path: chart
+    helm:
+      releaseName: scraping-platform
+      valueFiles:
+        - ../platform/defaults.json
+        - ../workloads/scraping-platform/values.json
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: scraping-platform
+  syncPolicy:
+    managedNamespaceMetadata:
+      labels:
+        simple-k3s-harness.dev/workload: "true"
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
