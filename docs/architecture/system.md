@@ -31,6 +31,7 @@ OpenBao, Spring Cloud Config Server, ARC, DinD 러너 인프라는 운영 범위
 | 운영자 | 배포 하네스 | 배포 설정 변경 |
 | 앱 개발 에이전트 | 배포 하네스 | 배포 요청 API로 워크로드 조회·생성·수정 |
 | 운영자 | Secret Manage System | 직접 웹 UI에 접속해 CI 자격증명과 앱 실행용 Secret 관리 |
+| 앱 개발 에이전트 | Secret Manage System | 운영자의 GitHub 토큰으로 시크릿 생성과 정책 승인 요청 |
 | 배포 하네스 | Secret Manage System | 선언된 SMS 구성 동기화 |
 | GitHub | Secret Manage System | 실행 신원을 제시하고 CI 값 요청 |
 | Secret Manage System | GitHub | 요청한 CI 자격증명 반환 |

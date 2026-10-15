@@ -18,6 +18,8 @@ SMS는 허용 정책에 등록된 저장소·브랜치·이벤트·워크플로�
 5. 허용 워크플로에 `<owner>/<repo>/.github/workflows/<file>@refs/heads/<branch>`를 넣는다. 와일드카드는 쓸 수 없다.
 6. "허용 정책 저장"을 누른다. 다음 권한 검사부터 적용된다.
 
+운영자가 웹 UI에서 직접 등록하는 대신 코딩 에이전트가 에이전트 경로(`POST /v1/agent/repositories/{id}`)로 정책 생성을 요청할 수도 있다. 에이전트가 생성한 정책은 `PENDING` 상태로 등록되어 CI 조회가 허용되지 않는다. 이후 운영자가 SMS 저장소 목록 화면(`https://secrets.homelab.robinjoon.xyz/admin/repositories`)에서 해당 정책의 "활성화" 버튼을 눌러 승인해야 `ACTIVE` 상태가 되어 권한 검사에 적용된다.
+
 ## 앱 CI에 연결
 
 원격 하위 디렉터리 Action은 `{owner}/{repo}/{path}@{ref}` 형식으로 부른다. 경로는 `action.yml`이 있는 디렉터리까지 적고, 운영에서는 `v1.0.0` 같은 게시 태그를 쓴다. 게시한 태그는 옮기지 않고 바뀌면 새 버전을 만든다. [원격 Action 문법](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-using-a-public-action-in-a-subdirectory)
