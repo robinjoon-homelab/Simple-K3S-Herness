@@ -1,0 +1,119 @@
+{
+  "contractVersion": 1,
+  "metadata": {
+    "name": "agent-docs",
+    "namespace": "agent-docs"
+  },
+  "workload": {
+    "kind": "deployment",
+    "replicas": 1,
+    "containers": [
+      {
+        "name": "app",
+        "image": {
+          "repository": "registry.homelab.robinjoon.xyz/apps/agent-docs",
+          "tag": "sha-846f5ddde5ca8fbfd03a4d59b6c2297965ed3336-run-39259833792-2"
+        },
+        "ports": [
+          {
+            "name": "http",
+            "containerPort": 8080
+          }
+        ],
+        "env": [
+          {
+            "name": "SPRING_PROFILES_ACTIVE",
+            "value": "prod"
+          },
+          {
+            "name": "DB_PORT",
+            "secretKeyRef": {
+              "name": "shared-db-app",
+              "key": "port"
+            }
+          },
+          {
+            "name": "SPRING_DATASOURCE_URL",
+            "value": "jdbc:postgresql://$(DB_HOST):$(DB_PORT)/agent_docs"
+          },
+          {
+            "name": "SPRING_DATASOURCE_USERNAME",
+            "secretKeyRef": {
+              "name": "shared-db-app",
+              "key": "username"
+            }
+          },
+          {
+            "name": "SPRING_DATASOURCE_PASSWORD",
+            "secretKeyRef": {
+              "name": "shared-db-app",
+              "key": "password"
+            }
+          },
+          {
+            "name": "AGENT_DOCS_OWNER",
+            "value": "robinjoon"
+          },
+          {
+            "name": "AGENT_DOCS_PUBLIC_URL",
+            "value": "https://agent-docs.homelab.robinjoon.xyz"
+          },
+          {
+            "name": "GITHUB_CLIENT_ID",
+            "secretKeyRef": {
+              "name": "agent-docs-runtime",
+              "key": "GITHUB_CLIENT_ID"
+            }
+          },
+          {
+            "name": "GITHUB_CLIENT_SECRET",
+            "secretKeyRef": {
+              "name": "agent-docs-runtime",
+              "key": "GITHUB_CLIENT_SECRET"
+            }
+          }
+        ]
+      }
+    ],
+    "imagePullSecrets": [
+      {
+        "name": "registry-credentials"
+      }
+    ]
+  },
+  "database": {
+    "name": "agent_docs"
+  },
+  "services": [
+    {
+      "name": "web",
+      "ports": [
+        {
+          "name": "http",
+          "port": 80,
+          "targetPort": "http"
+        }
+      ]
+    }
+  ],
+  "ingresses": [
+    {
+      "name": "public",
+      "service": "web",
+      "rules": [
+        {
+          "host": "agent-docs.homelab.robinjoon.xyz",
+          "paths": [
+            {
+              "path": "/",
+              "servicePort": "http"
+            }
+          ]
+        }
+      ],
+      "tls": {
+        "mode": "cert-manager"
+      }
+    }
+  ]
+}
