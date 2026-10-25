@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: juicefs-nas
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  # NFS는 용량을 강제하지 않는다. PVC와 묶기 위한 값이다.
+  capacity:
+    storage: 1Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4.2
+  nfs:
+    server: 192.168.0.222
+    path: /mnt/main/nfs_for_k8s
+  claimRef:
+    namespace: storage-system
+    name: juicefs-nas
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: juicefs-nas
+  namespace: storage-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  storageClassName: ""
+  volumeName: juicefs-nas
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Ti

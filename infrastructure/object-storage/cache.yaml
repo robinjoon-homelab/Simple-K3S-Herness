@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: juicefs-cache
+  namespace: storage-system
+  annotations:
+    # local-path는 PVC를 지우면 디렉터리도 지우므로 NAS에 아직 올리지 않은 블록을 잃지 않게 한다.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  storageClassName: local-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi

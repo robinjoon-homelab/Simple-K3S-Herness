@@ -1,0 +1,14 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: object-storage-db
+  namespace: database-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    # 메타데이터가 없으면 NAS의 블록을 객체로 되돌릴 수 없으므로 Argo CD가 지우지 않게 한다.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  name: juicefs
+  owner: defaultuser
+  cluster:
+    name: shared-db

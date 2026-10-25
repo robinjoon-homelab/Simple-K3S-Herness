@@ -1,0 +1,39 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: juicefs-gateway
+  namespace: storage-system
+spec:
+  secretName: juicefs-gateway-tls
+  dnsNames:
+    - storage.homelab.robinjoon.xyz
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: juicefs-gateway
+  namespace: storage-system
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - storage.homelab.robinjoon.xyz
+      secretName: juicefs-gateway-tls
+  rules:
+    - host: storage.homelab.robinjoon.xyz
+      http:
+        paths:
+          # 웹 화면은 /minio 아래에서만 동작한다. S3 API는 버킷 경로를 쓰므로 외부로 열리지 않는다.
+          - path: /minio
+            pathType: Prefix
+            backend:
+              service:
+                name: juicefs-gateway
+                port:
+                  name: s3

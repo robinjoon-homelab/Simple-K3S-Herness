@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: object-storage
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/robinjoon-homelab/Simple-K3S-Herness.git
+    targetRevision: main
+    path: infrastructure/object-storage
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: storage-system
+  syncPolicy:
+    # Reflector가 shared-db-app을 이 네임스페이스에 복제하도록 워크로드 라벨을 붙인다.
+    managedNamespaceMetadata:
+      labels:
+        simple-k3s-harness.dev/workload: "true"
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
