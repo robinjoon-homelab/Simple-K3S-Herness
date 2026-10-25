@@ -23,9 +23,13 @@ python3 -m unittest discover -s tests
 서버 테스트는 서버 의존성이 필요하다. 가상환경은 저장소 루트의 `.venv/`에 두며 Git이 추적하지 않는다.
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r server/requirements.txt
+python3 -m venv .venv
+.venv/bin/python -m pip install --no-cache-dir --no-deps --require-hashes -r server/bootstrap-requirements.txt
+.venv/bin/python -m pip install -r server/requirements.txt
 (cd server && ../.venv/bin/python -m unittest discover -s tests)
 ```
+
+서버는 Python 3.13.17 이상, pip 26.2.2 이상, certifi 2026.10.19 이상을 사용한다. pip는 Python 보안팀이 공개한 SHA-256으로 먼저 설치한다. 시스템 인증서도 갱신해야 하며 pip 자체의 인증서 번들은 시스템 갱신만으로 바뀌지 않는다. 근거와 이미지 발행 전 검사는 [배포 요청 API 운영 절차](../runbooks/deploy-api.md#이미지-인증서-검증)를 따른다.
 
 <a id="공통-action-개발과-검증"></a>
 

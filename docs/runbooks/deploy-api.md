@@ -19,6 +19,20 @@
 
 이후 `server/` 변경은 빌드 워크플로가 이미지 발행과 릴리스 요청까지 처리한다.
 
+## 이미지 인증서 검증
+
+서버 이미지는 Python 3.13.17의 digest를 고정하고 시스템 `ca-certificates`를 갱신한다. `server/bootstrap-requirements.txt`는 [Python 보안팀 안내](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576)의 SHA-256으로 pip 26.2.2를 설치한다. 런타임과 전이 의존성 버전은 `server/requirements.txt`에 고정한다. pip의 내장 certifi도 영향을 받으므로 시스템 인증서나 앱의 certifi만 교체해서는 충분하지 않다.
+
+빌드 워크플로는 이미지를 로컬에 적재한 뒤 UID 10001로 신뢰 저장소와 HTTPS 접속을 검사한다. 검사를 통과한 같은 이미지만 push하고 릴리스를 요청한다. 고정한 base digest와 의존성이 기존 설치 레이어를 무효화하며, 이후 캐시를 재사용해도 발행 전 검사는 매번 실행한다. 최초 보안 수정은 다음 명령으로 캐시 없이 재빌드하고 발행 없이 확인한다.
+
+```sh
+docker buildx build --platform linux/amd64 --pull --no-cache --load --provenance=false -t deploy-api:trust-check server
+docker run --rm --platform linux/amd64 deploy-api:trust-check python verify_trust.py --https --require-nonroot
+docker run --rm --platform linux/amd64 deploy-api:trust-check python -m pip check
+```
+
+`verify_trust.py`는 시스템·certifi·pip 내장 certifi·HTTPX 기본 컨텍스트에서 사고 관련 인증서의 SHA-256 지문이 없는지 검사한다. 대상은 신뢰 루트 `emSign ECC Root CA - G3`, 그 아래 TLS 발급자 `emSign Root TLS CA - G3`, 교차 서명 발급자 `AAA Certificate Services`다. 인증서·호스트명 검증이 켜져 있고 신뢰 저장소가 비어 있지 않아야 한다. `--https`는 자격증명 없이 GitHub API와 PyPI의 정상 TLS 응답도 확인한다. 이 검사는 이미지 내용의 증거이며 Argo CD 동기화나 실행 중인 Pod의 이미지 교체를 증명하지 않는다.
+
 ## 동작 점검
 
 배포한 뒤 실제 GitHub 토큰으로 다음을 확인하고 [검증 기록](../records/deploy-api.md)에 남긴다.

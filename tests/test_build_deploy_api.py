@@ -41,6 +41,15 @@ class BuildDeployApiWorkflowTest(unittest.TestCase):
         self.assertIn("USER 10001", dockerfile)
         self.assertIn('"deploy_api.main:app"', dockerfile)
 
+    def test_checks_the_built_image_before_push_and_release(self):
+        self.assertIn("pull: true", self.workflow)
+        self.assertIn("load: true", self.workflow)
+        self.assertNotIn("push: true", self.workflow)
+        self.assertLess(self.workflow.index("python verify_trust.py --https --require-nonroot"),
+                        self.workflow.index("run: docker push"))
+        self.assertLess(self.workflow.index("run: docker push"),
+                        self.workflow.index("gh workflow run release-workload-image.yml"))
+
 
 if __name__ == "__main__":
     unittest.main()
