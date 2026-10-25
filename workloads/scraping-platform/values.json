@@ -12,7 +12,7 @@
         "name": "app",
         "image": {
           "repository": "registry.homelab.robinjoon.xyz/apps/scraping-platform",
-          "tag": "sha-f8a514822e9958911b2c7db57871c6a16d720e85-run-37914599215-3"
+          "tag": "sha-08a10e284ac3f619ffe4946864f8d215205335d8-run-40195637834-1"
         },
         "ports": [
           {
