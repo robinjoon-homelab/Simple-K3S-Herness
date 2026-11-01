@@ -44,6 +44,7 @@ OpenBao, Spring Cloud Config Server, ARC, DinD 러너 인프라는 운영 범위
 | Secret Manage System | 공유 PostgreSQL | CI 자격증명 저장·조회 |
 | Secret Manage System | Kubernetes Secrets | 일반 앱용 텍스트 `Opaque` Secret 조회·생성·수정 |
 | 각 앱 | 공유 PostgreSQL | 앱 실행 데이터 저장·조회 |
+| 온보딩한 앱 | 중앙 egress 프록시 | 외부 HTTPS를 명시적 CONNECT로 전달하고 프록시가 복호화·재검증 |
 
 ## L2 — 실행 단위와 저장소
 

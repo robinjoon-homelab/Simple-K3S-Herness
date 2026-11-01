@@ -1,0 +1,22 @@
+{
+  "source": {
+    "package": "certifi",
+    "version": "2026.10.19",
+    "url": "https://files.pythonhosted.org/packages/c4/51/29046e48f693c54e5b7412216d447a1d8362c9653148d98c02cdf65fa733/certifi-2026.10.19-py3-none-any.whl",
+    "sha256": "42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b",
+    "member": "certifi/cacert.pem"
+  },
+  "blockedRoots": {
+    "7dd78d5f4f13459a83dff9abbba62edbaf6f2d102bf257fd712f4d9f2746ed8d": "emSign Root TLS CA - G3: issued the compromised eMudhra TLS intermediates",
+    "f2edaaff3d9b701fb4d14c9f285f8c0bad90fc3bcc1fa07d47f4718edaba34a5": "emSign Root CS CA - G3: issued the compromised eMudhra code-signing intermediates",
+    "d7a7a0fb5d7e2731d771e9484ebcdef71d5f0c3e0a2948782bc83ee0ea699ef4": "AAA Certificate Services: cross-signed the compromised eMudhra intermediates",
+    "86a1ecba089c4a8d3bbe2734c612ba341d813e043cf9e8a862cd5c57a36bbe6b": "emSign ECC Root CA - G3: cross-signed the eMudhra direct issuers"
+  },
+  "reviewedOperatorRoots": {
+    "40f6af0346a99aa1cd1d555a4e9cce62c7f9634603ee406615833dc8c8d00367": "emSign Root CA - G1: outside the incident per the Python security advisory",
+    "125609aa301da0a249b97a8239cb6a34216f44dcac9f3954b14292f2e8c8608f": "emSign Root CA - C1: outside the incident per the Python security advisory",
+    "bc4d809b15189d78db3e1d8cf4f9726a795da1643ca5f1358e1ddb0edc0d7eb3": "emSign ECC Root CA - C3: outside the incident per the Python security advisory"
+  },
+  "operatorMarkers": ["eMudhra", "emSign"],
+  "minimumRoots": 100
+}

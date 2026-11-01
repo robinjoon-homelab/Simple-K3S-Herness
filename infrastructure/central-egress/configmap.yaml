@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: egress-proxy-config
+  namespace: central-egress
+data:
+  config.yaml: |
+    config:
+      session:
+        key: disabled
+      connectionMinTerminationDeadline: 5s
+      connectionTerminationDeadline: 55s
+    frontendPolicies:
+      accessLog:
+        # 복호화한 요청의 경로와 쿼리에는 토큰이 들어 있을 수 있다.
+        remove:
+          - http.path
+    binds:
+      - port: 3128
+        tunnelProtocol: connect
+        listeners: []
+      # 포트를 지정하지 않아 CONNECT 대상 포트와 관계없이 모든 터널을 복호화한다.
+      - mode: internal
+        listeners:
+          - protocol: HTTPS
+            tls:
+              mode: dynamicCa
+              cert: /var/run/secrets/egress-proxy/dynamic-ca/issuer.crt
+              key: /var/run/secrets/egress-proxy/dynamic-ca/issuer.key
+            routes:
+              - backends:
+                  - dynamic: {}
+                    policies:
+                      backendTLS:
+                        root: /etc/egress-proxy/upstream-ca/ca-bundle.pem

@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: central-egress
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/robinjoon-homelab/Simple-K3S-Herness.git
+    targetRevision: main
+    path: infrastructure/central-egress
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: central-egress
+  syncPolicy:
+    # Reflector가 registry-credentials를 이 네임스페이스에 복제하도록 워크로드 라벨을 붙인다.
+    managedNamespaceMetadata:
+      labels:
+        simple-k3s-harness.dev/workload: "true"
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # CA 번들이 client-side apply의 last-applied 어노테이션 한도에 가깝다.
+      - ServerSideApply=true
