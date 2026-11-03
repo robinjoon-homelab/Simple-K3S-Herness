@@ -75,7 +75,7 @@ zot에 내장된 htpasswd 인증과 저장소 ACL을 사용하고 익명 접근�
 
 `registry.homelab.robinjoon.xyz`가 Traefik 진입점을 가리키도록 하는 DNS 레코드는 외부 접근의 선행 조건이지만 이 저장소에서 생성하지 않는다. Tailscale Operator와 홈 LAN 서브넷 라우터는 `default` Project의 별도 인프라 Application으로 선언한다. 공식 전용 Chart와 Connector를 사용하며 일반 워크로드 계약의 지원 범위를 확장하지 않는다. 계정·tailnet 접근 정책·경로 승인은 외부 Tailscale 관리 영역에 남고, OAuth 자격증명은 Git 밖의 Kubernetes Secret으로 등록한다. VPN은 zot 인증과 ACL을 대체하지 않으며 TLS와 zot 접근 제어는 유지한다. 설치 절차는 [VPN 운영 절차](../runbooks/vpn.md)를 따른다.
 
-중앙 egress TLS 검사 프록시도 `default` Project의 인프라 Application이며 `central-egress` 네임스페이스의 ClusterIP Service로만 제공한다. 일반 워크로드 계약의 지원 범위를 넓히지 않고, 앱은 values의 환경변수와 Secret 볼륨으로 이 프록시를 사용한다. 절차는 [중앙 egress TLS 검사 프록시](../runbooks/egress-proxy.md)를 따른다.
+중앙 egress TLS 검사 프록시도 `default` Project의 인프라 Application이며 `central-egress` 네임스페이스의 ClusterIP Service로만 제공한다. 일반 워크로드 계약의 지원 범위를 넓히지 않고, 앱은 values의 환경변수와 Secret 볼륨으로 이 프록시를 사용한다. 이미지 digest는 `tools/release.py`가 아니라 전용 워크플로 `release-central-egress-image.yml`이 바꾸며 같은 동시성 그룹으로 직렬화한다. 절차는 [중앙 egress TLS 검사 프록시](../runbooks/egress-proxy.md)를 따른다.
 
 ## 5. 변경 인터페이스 계약
 

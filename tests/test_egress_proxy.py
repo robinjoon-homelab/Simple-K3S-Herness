@@ -22,7 +22,6 @@ POLICY = ROOT / "tools/egress_ca_policy.json"
 VERIFY_TRUST = ROOT / "server/verify_trust.py"
 BLOCKED_FIXTURE = ROOT / "server/tests/fixtures/emsign-ecc-root-g3.pem"
 RUNBOOK = ROOT / "docs/runbooks/egress-proxy.md"
-RECORD = ROOT / "docs/records/egress-proxy.md"
 ISSUER_DIR = "/var/run/secrets/egress-proxy/dynamic-ca"
 UPSTREAM_DIR = "/etc/egress-proxy/upstream-ca"
 FORBIDDEN_NETWORKS = (
@@ -424,10 +423,11 @@ class WorkloadBoundaryTest(unittest.TestCase):
         self.assertIn("`NODE_EXTRA_CA_CERTS`는 기존 공인 CA 신뢰에 더하는 방식이라 쓰지 않는다", runbook)
         self.assertIn("루트 키 침해", runbook)
 
-    def test_release_record_tracks_the_pinned_digest(self):
-        deployment = (RESOURCES / "deployment.yaml").read_text()
-        digest = re.search(r"@(sha256:[0-9a-f]{64})", deployment)[1]
-        self.assertIn(digest, RECORD.read_text())
+    def test_runbook_states_the_ci_release_path(self):
+        runbook = RUNBOOK.read_text()
+        for name in ("homelab-image.yml", "release-central-egress-image.yml", "HOMELAB_RELEASE_ON_PUSH",
+                     "release_central_egress.py", "1441980515", "328391212"):
+            self.assertIn(name, runbook)
 
 
 if __name__ == "__main__":

@@ -16,7 +16,64 @@
 
 목적지 허용 목록은 없고 포트도 제한하지 않는다. 모든 터널을 복호화하며 인증서 검증을 끄는 설정과 TLS passthrough는 두지 않는다. 클라이언트가 SNI를 보내지 않거나 IP 주소로 접속하면 CONNECT 대상 기준으로 인증서를 발급한다.
 
-이미지는 [agentgateway 포크](https://github.com/robinjoon-homelab/agentgateway)의 `Dockerfile.headless`로 만든다. Rust 소스 리비전을 `GIT_REVISION`으로 넘기고, 프로파일은 LTO 없는 최적화 빌드인 `quick-release`를 쓴다. 이미지에는 CA 저장소가 없어서 기본 번들로 대체되지 않는다.
+이미지는 [agentgateway 포크](https://github.com/robinjoon-homelab/agentgateway)의 `Dockerfile.headless`로 만든다. 프로파일은 LTO 없는 최적화 빌드인 `quick-release`를 쓴다. 이미지에는 CA 저장소가 없어서 기본 번들로 대체되지 않는다.
+
+## CI 이미지 발행과 릴리스
+
+이미지는 다른 앱처럼 GitHub Actions에서 만들고 발행한다. 로컬 Docker 로그인은 필요하지 않다. 경로는 `포크의 homelab-image.yml → SMS → zot → 하네스의 release-central-egress-image.yml → main 커밋 → Argo CD`다. 일반 앱용 `release-workload-image.yml`은 `workloads/<app>/values.json`만 바꾸므로, 이 프록시는 같은 동시성 그룹을 쓰는 전용 워크플로로 릴리스한다.
+
+| 포크의 이벤트 | 실행 범위 | 자격증명 |
+| --- | --- | --- |
+| `main` 대상 `pull_request` | 회귀 테스트, 두 아키텍처 빌드, 이미지 검증 | 없음 |
+| `main`의 `push` | 위 범위와 발행. 변수 `HOMELAB_RELEASE_ON_PUSH`가 `true`일 때만 릴리스를 요청한다 | SMS의 `zot`, `harness` |
+| `main`의 `workflow_dispatch` | 위 범위와 발행. 입력 `release`가 `true`일 때만 릴리스를 요청한다 | SMS의 `zot`, `harness` |
+
+빌드는 `ubuntu-24.04`와 `ubuntu-24.04-arm`에서 네이티브로 실행하고 자격증명을 받지 않는다. 검증 스크립트 `tools/verify_headless_image.sh`는 일회용 CA와 `HARNESS_CONFIG_REVISION`에 고정한 하네스의 실제 설정으로 이미지를 시험한다. 버전, UID, CA 저장소 부재, 설정 검증, SNI 없는 접속, 잘못된 인증서 거부, 로그의 쿼리 문자열 부재를 본다. 발행 job은 저장소 코드를 받지 않고 검증된 OCI 아카이브만 올린다.
+
+하네스 쪽은 `tools/release_central_egress.py`가 `deployment.yaml`의 digest 한 곳만 바꾼다. digest 형식, 이미지 저장소, 이미지 줄 개수가 다르면 파일을 건드리지 않고 실패한다. 커밋이 `main`에 들어가면 Argo CD가 프록시를 교체하므로, 릴리스 요청은 일반 앱과 같은 무게의 배포다.
+
+## 최초 활성화 순서
+
+이 순서는 이미지가 레지스트리에 없는 상태로 프록시가 배포되지 않게 한다. 아래 단계는 모두 운영자가 실행한다.
+
+1. 포크의 Actions를 켜고 상속한 워크플로를 먼저 끈다. 포크는 업스트림 워크플로를 그대로 갖고 있으며 `release.yml`과 `pull_request.yml`에는 저장소 조건이 없다. 이 단계 전에 태그를 push하면 `release.yml`이 실행된다.
+
+   ```bash
+   for workflow in release.yml pull_request.yml nightly.yml model-catalog.yml debug_cache.yml; do
+     gh workflow disable "$workflow" --repo robinjoon-homelab/agentgateway
+   done
+   gh workflow list --all --repo robinjoon-homelab/agentgateway
+   ```
+
+2. [SMS에 허용 정책을 등록](load-ci-secrets.md#sms-허용-정책-등록)하고 운영자가 활성화한다. 값은 다음과 같다.
+
+   ```yaml
+   repositories:
+     - repositoryId: "1441980515"
+       repositoryOwnerId: "328391212"
+       repository: robinjoon-homelab/agentgateway
+       allowedRefs: [refs/heads/main]
+       allowedEvents: [push, workflow_dispatch]
+       allowedWorkflows:
+         - robinjoon-homelab/agentgateway/.github/workflows/homelab-image.yml@refs/heads/main
+   ```
+
+3. 패치와 워크플로를 포크 `main`에 넣는다. `main`은 패치의 기준 커밋보다 앞서 있어 Rust 소스가 달라진다. CI는 합친 소스의 회귀 테스트와 이미지 검증을 실행하지만, [독립 검증](../records/egress-proxy.md)은 합치기 전 소스에 대한 결과이므로 필요한 범위를 다시 시험한다.
+4. 이 push의 실행이 이미지를 발행한다. `HOMELAB_RELEASE_ON_PUSH`를 아직 정하지 않았으므로 릴리스는 요청하지 않는다. 다시 발행할 때는 `workflow_dispatch`를 `release=false`로 실행한다. 실행 요약의 digest와 빌드 커밋을 적어 둔다.
+5. 하네스 준비 브랜치에서 digest를 고정해 커밋한다. 이 변경은 아직 클러스터에 반영되지 않는다.
+
+   ```bash
+   python3 tools/release_central_egress.py --digest <index-digest> --source-revision <commit>
+   python3 -m unittest tests.test_egress_proxy tests.test_release_central_egress
+   ```
+
+6. 1절로 검사 CA를 발급해 가져온다.
+7. 하네스 브랜치를 `main`에 병합해 2절과 3절을 진행한다.
+8. 게이트를 통과한 뒤 포크의 `HARNESS_CONFIG_REVISION`을 하네스 `main`의 커밋으로 올리고, 이후 `main`의 push가 릴리스를 요청하게 한다.
+
+   ```bash
+   gh variable set HOMELAB_RELEASE_ON_PUSH --body true --repo robinjoon-homelab/agentgateway
+   ```
 
 ## 1. 검사 CA 발급과 가져오기
 
@@ -67,7 +124,7 @@ kubectl -n central-egress annotate secret egress-proxy-public-ca --overwrite \
 
 ## 2. 배포
 
-1. `deployment.yaml`의 `image` digest가 레지스트리에 발행되어 있는지 `docker buildx imagetools inspect`로 확인한다. 발행 상태는 [검증 기록](../records/egress-proxy.md)에 남기며, 발행 전에 병합하면 Pod가 `ImagePullBackOff`에 머문다.
+1. `deployment.yaml`의 `image`가 [CI가 발행한 digest](#최초-활성화-순서)인지 확인한다. 발행 전에 병합하면 Pod가 `ImagePullBackOff`에 머문다.
 2. 변경을 `main`에 병합한다. Root Application이 `central-egress` Application을 만들고, 이 Application이 프록시와 NetworkPolicy, `egress-proxy-canary` 네임스페이스를 동기화한다.
 3. 다음 명령으로 Pod가 `Ready`인지 확인한다. `Ready`는 설정을 읽었다는 뜻이며 차단 정책이 동작한다는 증거는 아니다.
 

@@ -27,3 +27,22 @@
 
 - 이 digest는 로컬에서 내보낸 OCI 아카이브의 값이며 **레지스트리 발행은 끝나지 않았다.** 레지스트리 인증을 기다리고 있었다.
 - 클러스터에 접속할 수 없어 배포와 운영 절차의 게이트 A·B·C를 실행하지 않았다. NetworkPolicy 집행과 노드 차단은 확인하지 않았다.
+
+## 2026-11-02 CI 경로 준비
+
+앞 절의 digest는 CI가 아니라 로컬에서 만든 이미지의 값이다. 사용자가 로컬 레지스트리 로그인 대신 기존 CI 경로를 쓰도록 바로잡았으므로 이 아카이브는 발행하지 않는다. 하네스의 `deployment.yaml`에 남은 값은 [최초 활성화 순서](../runbooks/egress-proxy.md#최초-활성화-순서)에서 CI가 발행한 digest로 바꿔야 한다.
+
+포크의 `homelab-image.yml`, 하네스의 `release-central-egress-image.yml`과 `tools/release_central_egress.py`를 로컬에서 작성했다. 사용자가 로컬 준비까지만 요청했으므로 원격 저장소에 push하지 않았고, Actions 실행, SMS 정책 등록, 이미지 발행, 배포를 하지 않았다.
+
+확인한 것은 다음과 같다.
+
+- 하네스 테스트는 188개 가운데 187개가 통과하고, 선택 사항인 Traefik 픽스처 시험 1개를 건너뛰었다. 포크의 워크플로 정책 시험과 문서 검사도 통과했다.
+- actionlint 1.7.12는 `homelab-image.yml`에서 문제를 찾지 못했다. `release-central-egress-image.yml`은 `queue` 키 경고만 제외하면 통과한다. 이 도구가 아직 모르는 키이며, 기존 `release-workload-image.yml`에도 같은 경고가 나오고 GitHub 문서에 있는 문법임을 따로 확인했다.
+- 독립 검증에서 `tools/verify_headless_image.sh`를 기존 arm64 이미지에 실행해 메타데이터, UID, CA 저장소 부재, 설정 검증, 읽기 전용 실행, SNI 없는 IP 접속, 공개 TLS, 사고 체인과 루프백 거부, 로그 검사가 통과했다.
+- BuildKit 0.30에서 `type=oci`와 `type=docker`를 함께 내보낸 결과의 rootfs `diff_ids`와 실행 설정이 일치했다.
+
+확인하지 않은 범위는 다음과 같다.
+
+- 두 워크플로를 GitHub에서 실행한 적이 없다. GitHub runner의 회귀 테스트, zot에 대한 `skopeo`와 `imagetools` 발행, SMS 조회, 하네스 릴리스 요청이 여기에 해당한다.
+- `Dockerfile.headless`의 컴파일 경로를 끝까지 실행한 적이 없다. 지금까지의 이미지는 미리 빌드한 바이너리를 패키징했다.
+- 빌드는 `CARGO_BUILD_JOBS=1`로 실행하도록 정했으며, 이 설정으로 GitHub runner의 시간 제한 안에 끝나는지는 확인하지 않았다.
