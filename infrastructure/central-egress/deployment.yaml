@@ -34,7 +34,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: gateway
-          image: registry.homelab.robinjoon.xyz/apps/agentgateway@sha256:5992d2dab8276d0d3f298654f5b5b257fb79e23a9f88607f055748db4a5e9365
+          image: registry.homelab.robinjoon.xyz/apps/agentgateway@sha256:4df318254a41ea9b9e43e4215e5afdf17255c0d48d1d3882fb8a0708c6e57f84
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

@@ -46,3 +46,29 @@
 - 두 워크플로를 GitHub에서 실행한 적이 없다. GitHub runner의 회귀 테스트, zot에 대한 `skopeo`와 `imagetools` 발행, SMS 조회, 하네스 릴리스 요청이 여기에 해당한다.
 - `Dockerfile.headless`의 컴파일 경로를 끝까지 실행한 적이 없다. 지금까지의 이미지는 미리 빌드한 바이너리를 패키징했다.
 - 빌드는 `CARGO_BUILD_JOBS=1`로 실행하도록 정했으며, 이 설정으로 GitHub runner의 시간 제한 안에 끝나는지는 확인하지 않았다.
+
+## 2026-11-03 CI 발행과 CA 준비
+
+앞 절에서 확인하지 못한 GitHub runner 실행과 zot 발행을 이번에 확인했다. `deployment.yaml`은 아래 인덱스 digest로 고정했다. 하네스 릴리스 워크플로가 아직 `main`에 없어 같은 도구인 `tools/release_central_egress.py`를 작업 브랜치에서 직접 실행했다.
+
+| 항목 | 값 |
+| --- | --- |
+| 포크 소스 리비전 | `630e018c712860c7a12514d67224610cd666994e` |
+| Actions 실행 | [`41656700782`](https://github.com/robinjoon-homelab/agentgateway/actions/runs/41656700782) |
+| 이미지 태그 | `registry.homelab.robinjoon.xyz/apps/agentgateway:sha-630e018c712860c7a12514d67224610cd666994e-run-41656700782-1` |
+| OCI 인덱스 digest | `sha256:4df318254a41ea9b9e43e4215e5afdf17255c0d48d1d3882fb8a0708c6e57f84` |
+| 플랫폼 매니페스트 digest | `sha256:ca078c8b4736347d27c622d1e3781e914a7e2eb1010fde2cb3c00ee19c9e5aa6`, `sha256:34e3b48f0570546ab97ee6253bbf8ddd20748cd04697cfe813ccc3118a65a9b3` (로그에 아키텍처 표시가 없어 구분하지 않았다) |
+| 검사 CA 루트 지문 | `BF:03:21:92:48:3E:FE:77:0D:85:69:9A:F4:1D:68:71:56:07:61:8E:24:45:02:D4:19:EB:63:51:08:C5:84:00`, 2036-10-31 만료 |
+| 발급 CA 지문 | `77:8F:B1:21:8B:E8:85:4C:07:8A:58:BF:24:C7:8D:04:EE:83:6D:88:91:6A:D8:48:23:E4:16:BC:8E:A1:50:37`, 2027-11-03 만료 |
+
+확인한 것은 다음과 같다.
+
+- 포크 `main`에서 단위 테스트 25개와 통합 테스트 40개가 실패 없이 통과했다. 45개 커밋이 앞선 `main`과 합친 코드로 돌린 첫 Rust 테스트다.
+- amd64와 arm64를 각 아키텍처의 runner에서 `Dockerfile.headless`로 컴파일했고, 두 이미지 모두 발행 전 `tools/verify_headless_image.sh`를 통과했다. `CARGO_BUILD_JOBS=1`에서 회귀 테스트 49분, amd64 28분, arm64 36분이 걸려 시간 제한 안에 끝났다.
+- SMS에서 받은 자격증명으로 zot에 발행했고, 발행한 인덱스를 digest로 다시 받았다. `HOMELAB_RELEASE_ON_PUSH`가 꺼져 있어 하네스 릴리스 요청 단계는 건너뛰었다.
+- 운영 세션의 보고에 따르면 `central-egress` 네임스페이스와 `egress-proxy-dynamic-ca`, `egress-proxy-public-ca` Secret을 만들었다. 지문은 이 보고의 값이다. 발급 CA 키는 파일로 남기지 않았다.
+
+확인하지 않은 범위는 다음과 같다.
+
+- 아직 배포하지 않았고 운영 절차의 게이트 A·B·C를 실행하지 않았다. NetworkPolicy 집행과 노드 차단도 마찬가지다.
+- **루트 키의 오프라인 보관은 끝나지 않았다.** 지금은 작업 Mac에 암호화한 파일로 있고 암호는 macOS Keychain에 있다. 운영 절차대로 오프라인 매체로 옮겨야 한다.
