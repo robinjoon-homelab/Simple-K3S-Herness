@@ -27,6 +27,7 @@
 | [배포 요청 API](runbooks/deploy-api.md) | 서버 빌드·배포와 동작 점검 |
 | [공용 Traefik HTTPS 정책](runbooks/traefik-https.md) | 정책 적용과 외부 접속 확인 |
 | [홈 LAN VPN](runbooks/vpn.md) | Tailscale 인증, 배포, 외부 접속 확인 |
+| [중앙 egress TLS 검사 프록시](runbooks/egress-proxy.md) | 검사 CA 발급, 카나리 게이트, 앱 온보딩, CA 번들 갱신, 긴급 차단, 롤백 |
 
 ## 검증 기록
 
@@ -36,6 +37,7 @@
 - [배포 요청 API](records/deploy-api.md)
 - [공용 Traefik HTTPS 정책](records/traefik-https.md)
 - [홈 LAN VPN](records/vpn.md)
+- [중앙 egress TLS 검사 프록시](records/egress-proxy.md)
 
 ## 개발
 

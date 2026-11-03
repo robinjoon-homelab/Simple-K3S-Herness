@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: egress-proxy
+  namespace: central-egress
+spec:
+  replicas: 1
+  # 새 Pod가 준비된 뒤 이전 Pod를 내려 롤아웃 중에도 프록시를 유지한다.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: egress-proxy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: egress-proxy
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # connectionTerminationDeadline(55s)이 끝난 뒤 스스로 종료할 시간을 둔다.
+      terminationGracePeriodSeconds: 60
+      imagePullSecrets:
+        - name: registry-credentials
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: registry.homelab.robinjoon.xyz/apps/agentgateway@sha256:4df318254a41ea9b9e43e4215e5afdf17255c0d48d1d3882fb8a0708c6e57f84
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: connect
+              containerPort: 3128
+            - name: readiness
+              containerPort: 15021
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: readiness
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          # subPath를 쓰면 kubelet이 갱신한 파일이 Pod에 반영되지 않는다.
+          volumeMounts:
+            - name: config
+              mountPath: /etc/agentgateway
+              readOnly: true
+            - name: dynamic-ca
+              mountPath: /var/run/secrets/egress-proxy/dynamic-ca
+              readOnly: true
+            - name: upstream-ca
+              mountPath: /etc/egress-proxy/upstream-ca
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: egress-proxy-config
+        - name: dynamic-ca
+          secret:
+            secretName: egress-proxy-dynamic-ca
+            defaultMode: 0440
+        - name: upstream-ca
+          configMap:
+            name: egress-proxy-upstream-ca
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

@@ -1,0 +1,98 @@
+name: Release central egress image
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: Published image index digest (sha256:...)
+        required: true
+        type: string
+      source_revision:
+        description: Full commit SHA the image was built from
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+# Shares the workload release group so that all GitOps release commits stay serialized.
+concurrency:
+  group: release-workload-image
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_DIGEST: ${{ inputs.digest }}
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+      DEPLOYMENT_FILE: infrastructure/central-egress/deployment.yaml
+      REQUIRE_HELM: "1"
+    steps:
+      - name: Check out the harness
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.0.5
+
+      - name: Fast-forward to the latest main
+        run: git pull --ff-only origin main
+
+      - name: Update the image digest
+        run: |
+          python3 tools/release_central_egress.py \
+            --digest "$IMAGE_DIGEST" \
+            --source-revision "$SOURCE_REVISION"
+
+      - name: Verify the change scope
+        id: changes
+        shell: bash
+        run: |
+          changed_files="$(git status --porcelain)"
+
+          if [[ -z "$changed_files" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$changed_files" != " M ${DEPLOYMENT_FILE}" ]]; then
+            echo "Unexpected changed files:" >&2
+            printf '%s\n' "$changed_files" >&2
+            exit 1
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Validate the manifests
+        if: steps.changes.outputs.changed == 'true'
+        run: python3 -m unittest tests.test_egress_proxy
+
+      - name: Commit the release
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$DEPLOYMENT_FILE"
+          git commit -m "chore(central-egress): deploy image ${IMAGE_DIGEST}" \
+            -m "Built from robinjoon-homelab/agentgateway@${SOURCE_REVISION}."
+
+      - name: Push the release
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          if git push origin HEAD:main; then
+            exit 0
+          fi
+
+          git pull --rebase origin main
+          git push origin HEAD:main

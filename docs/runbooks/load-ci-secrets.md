@@ -79,6 +79,8 @@ push가 성공하면 하네스의 `Release workload image` 워크플로를 요�
 
 워크플로는 `tools/release.py`로 태그 하나만 바꾸고 Helm 검증을 통과한 변경만 `main`에 커밋·push한다. 요청은 직렬로 처리하며, 다른 커밋과 겹쳐 첫 push가 실패하면 최신 `main` 위로 한 번 rebase한 뒤 다시 push한다. `main` 브랜치 보호가 Actions의 직접 push를 막으면 이 봇의 push를 허용하거나 PR 기반 흐름으로 바꿔야 한다.
 
+중앙 egress 프록시는 워크로드가 아니므로 [전용 릴리스 워크플로](egress-proxy.md#ci-이미지-발행과-릴리스)를 쓴다.
+
 `release.py`는 이미지 repository를 바꾸지 않고, OCI 태그 문법에 맞지 않는 값과 `latest`를 거부한다. 같은 태그를 다시 요청하면 성공으로 처리하되 커밋을 만들지 않는다. 커밋 성공은 요청이 Git에 기록됐다는 뜻이며 Argo CD 동기화나 Pod 준비를 보장하지 않는다. 동작만 로컬에서 확인하려면 다음을 실행한다.
 
 ```bash

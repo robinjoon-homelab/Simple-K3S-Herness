@@ -1,0 +1,69 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-proxy
+  namespace: central-egress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 프록시를 쓰는 앱의 네임스페이스를 여기에 명시한다. 나머지는 접속할 수 없다.
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - egress-proxy-canary
+      ports:
+        - protocol: TCP
+          port: 3128
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 공인 IPv4·IPv6만 허용한다. 포트는 제한하지 않는다. Kubernetes는 Pod가 실행 중인 노드와의
+    # 트래픽을 ipBlock과 무관하게 허용할 수 있으므로 노드 차단은 운영 절차의 게이트로 확인한다.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 0.0.0.0/8 # 현재 네트워크
+              - 10.0.0.0/8 # 사설 대역, k3s Pod·Service 대역
+              - 100.64.0.0/10 # CGNAT, Tailscale
+              - 127.0.0.0/8 # 루프백
+              - 168.63.129.16/32 # 클라우드 메타데이터
+              - 169.254.0.0/16 # 링크 로컬, 클라우드 메타데이터
+              - 172.16.0.0/12 # 사설 대역
+              - 192.0.0.0/24 # IETF 예약
+              - 192.0.2.0/24 # 문서용
+              - 192.168.0.0/16 # 사설 대역, 홈 LAN
+              - 198.18.0.0/15 # 벤치마크
+              - 198.51.100.0/24 # 문서용
+              - 203.0.113.0/24 # 문서용
+              - 224.0.0.0/4 # 멀티캐스트
+              - 240.0.0.0/4 # 예약
+      ports:
+        - protocol: TCP
+    # 2000::/3 밖의 루프백, IPv4 매핑, NAT64, ULA, 링크 로컬, 멀티캐스트는 처음부터 제외된다.
+    - to:
+        - ipBlock:
+            cidr: 2000::/3
+            except:
+              - 2001::/23 # 특수 목적, Teredo
+              - 2001:db8::/32 # 문서용
+              - 2002::/16 # 6to4
+              - 3fff::/20 # 문서용
+      ports:
+        - protocol: TCP

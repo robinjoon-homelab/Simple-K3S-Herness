@@ -13,7 +13,7 @@
 
 앱 저장소에서 일하는 에이전트는 배포 요청 API(`https://deploy.homelab.robinjoon.xyz`)로 워크로드를 조회·생성·수정한다. API는 GitHub API로 조회하고 호출자 GitHub 토큰으로 `apply-workload.yml`을 실행하며, 그 워크플로가 CLI로 파일을 수정해 커밋한다. 서버는 파일 수정·클러스터 접근·비밀 값 보관을 하지 않는다.
 
-k3s의 공통 서비스는 Argo CD(GitOps 동기화), zot(이미지), 공유 PostgreSQL/CNPG(DB), Kubernetes Secrets(실행 설정), cert-manager(TLS)이며 Traefik은 기본 앱 접속을 담당한다. SMS도 하네스로 배포하는 서비스다. 다이어그램에서는 이 서비스들을 내부 컨트롤러까지 나누지 않는다. Tailscale 서브넷 라우터는 홈 LAN 접근용 별도 인프라 앱으로 배포하며 장애 복구용이 아니다. Tailscale 계정·tailnet 정책·DNS는 외부 계층에서 관리한다. VPN의 초기 인증 등록과 접속 확인 절차는 `docs/runbooks/vpn.md`에 있다.
+k3s의 공통 서비스는 Argo CD(GitOps 동기화), zot(이미지), 공유 PostgreSQL/CNPG(DB), Kubernetes Secrets(실행 설정), cert-manager(TLS)이며 Traefik은 기본 앱 접속을 담당한다. SMS도 하네스로 배포하는 서비스다. 다이어그램에서는 이 서비스들을 내부 컨트롤러까지 나누지 않는다. Tailscale 서브넷 라우터는 홈 LAN 접근용 별도 인프라 앱으로 배포하며 장애 복구용이 아니다. Tailscale 계정·tailnet 정책·DNS는 외부 계층에서 관리한다. VPN의 초기 인증 등록과 접속 확인 절차는 `docs/runbooks/vpn.md`에 있다. 중앙 egress TLS 검사 프록시도 별도 인프라 앱으로 배포하며, 앱은 명시적으로 온보딩할 때만 이 프록시를 쓴다.
 
 하네스는 `traefik-policy` Application으로 공용 Traefik의 HTTPS 정책을 관리한다. `infrastructure/traefik/resources.yaml`의 `HelmChartConfig`와 공용 HSTS Middleware가 일반 앱·Argo CD·레지스트리에 HTTP→HTTPS 443 전환과 HSTS를 적용한다. cert-manager는 기존 인증서 발급·갱신을 담당한다. push 후 k3s Helm Controller가 Traefik을 갱신하므로 Application의 Synced 상태와 Traefik 적용 완료는 구분한다. Traefik 갱신 중 일시적인 접속 영향이 있을 수 있으며 Argo CD 서버 재시작은 필요하지 않다. 적용 확인은 `docs/runbooks/traefik-https.md`를 따른다.
 
@@ -40,6 +40,7 @@ CI와 앱 실행용 비밀은 다음처럼 구분한다.
 | `load-ci-secrets` Action 수정·소비 앱 CI 연결 | [`load-ci-secrets` Action](docs/contracts/load-ci-secrets.md), [Action 개발과 검증](docs/development/testing.md#공통-action-개발과-검증), [CI 자격증명 연동 절차](docs/runbooks/load-ci-secrets.md) |
 | 배포 요청 API·앱 에이전트 연동 | [배포 요청 API](docs/contracts/deploy-api.md), [운영 절차](docs/runbooks/deploy-api.md) |
 | 레지스트리·초기 연동 운영 | [레지스트리](docs/runbooks/registry.md), [초기 연동](docs/runbooks/bootstrap.md) |
+| 중앙 egress TLS 검사 프록시 운영·앱 온보딩 | [운영 절차](docs/runbooks/egress-proxy.md) |
 | 문서 작성·수정 | [문서 작성 규칙](docs/development/documentation.md). 수정 후 확인 목록으로 점검한다 |
 
 ## 작업 경계와 확인
