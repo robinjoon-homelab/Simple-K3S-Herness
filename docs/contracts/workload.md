@@ -75,7 +75,7 @@ zot에 내장된 htpasswd 인증과 저장소 ACL을 사용하고 익명 접근�
 
 `registry.homelab.robinjoon.xyz`가 Traefik 진입점을 가리키도록 하는 DNS 레코드는 외부 접근의 선행 조건이지만 이 저장소에서 생성하지 않는다. Tailscale Operator와 홈 LAN 서브넷 라우터는 `default` Project의 별도 인프라 Application으로 선언한다. 공식 전용 Chart와 Connector를 사용하며 일반 워크로드 계약의 지원 범위를 확장하지 않는다. 계정·tailnet 접근 정책·경로 승인은 외부 Tailscale 관리 영역에 남고, OAuth 자격증명은 Git 밖의 Kubernetes Secret으로 등록한다. VPN은 zot 인증과 ACL을 대체하지 않으며 TLS와 zot 접근 제어는 유지한다. 설치 절차는 [VPN 운영 절차](../runbooks/vpn.md)를 따른다.
 
-중앙 egress TLS 검사 프록시도 `default` Project의 인프라 Application이며 `central-egress` 네임스페이스의 ClusterIP Service로만 제공한다. 일반 워크로드 계약의 지원 범위를 넓히지 않고, 앱은 values의 환경변수와 Secret 볼륨으로 이 프록시를 사용한다. 이미지 digest는 `tools/release.py`가 아니라 전용 워크플로 `release-central-egress-image.yml`이 바꾸며 같은 동시성 그룹으로 직렬화한다. 절차는 [중앙 egress TLS 검사 프록시](../runbooks/egress-proxy.md)를 따른다.
+중앙 egress TLS 검사 프록시도 `default` Project의 인프라 Application이며 `central-egress` 네임스페이스의 ClusterIP Service로만 제공한다. 프록시 자체는 별도 인프라이고, 공통 Chart는 `platform/defaults.json`의 `platform.egress`에서 프록시 환경변수·검사 CA 볼륨·Java truststore 초기화와 외부 직접 접속 차단 정책을 모든 워크로드의 기본값으로 제공한다. 앱 코드와 앱별 values는 바꾸지 않는다. 프록시 설정을 무시하는 앱은 중앙 `excludedApps`에 근거를 기록하고 주입·차단을 모두 생략한다. 예외 앱은 중앙 검사를 받지 않는 상태다. `enforceNetworkPolicy`는 기존 앱의 설정 전환과 검증을 먼저 마치기 위한 중앙 배포 단계 값이며 최종 상태는 `true`다. 이미지 digest는 `tools/release.py`가 아니라 전용 워크플로 `release-central-egress-image.yml`이 바꾸며 같은 동시성 그룹으로 직렬화한다. 절차는 [중앙 egress TLS 검사 프록시](../runbooks/egress-proxy.md)를 따른다.
 
 ## 5. 변경 인터페이스 계약
 
@@ -115,7 +115,7 @@ AI 에이전트는 구성 변경에 `release.py`를 사용하지 않고, 앱 CI�
 
 `homelab-workloads` AppProject는 소스 저장소를 이 저장소 URL(`https://github.com/robinjoon-homelab/Simple-K3S-Herness.git`)로 제한한다. 대상 서버는 기본 Kubernetes API 서버이며 앱마다 namespace가 달라 destinations의 `namespace: "*"`는 유지한다. 이는 모든 namespace에 임의로 배포한다는 운영 목표가 아니라, Child Application의 앱별 namespace를 하나의 Project에서 수용하기 위한 설정이다.
 
-워크로드 Project는 Namespace 생성과 공통 Chart가 직접 만드는 Deployment, Service, ConfigMap, Ingress, cert-manager Certificate, CNPG Database를 허용한다. Argo CD 리소스 트리에서 컨트롤러가 만든 하위 리소스를 확인할 수 있도록 ReplicaSet, Pod, Secret, CertificateRequest, Order, Challenge도 허용한다. 이 하위 리소스들은 JSON 계약이 직접 생성하지 않는다. 기존 앱별 Traefik Middleware의 조회·정리를 위해 해당 허용 항목은 유지하지만 공통 Chart가 새 Middleware를 생성하지는 않는다.
+워크로드 Project는 Namespace 생성과 공통 Chart가 직접 만드는 Deployment, Service, ConfigMap, Ingress, cert-manager Certificate, CNPG Database를 허용한다. Argo CD 리소스 트리에서 컨트롤러가 만든 하위 리소스를 확인할 수 있도록 ReplicaSet, Pod, Secret, CertificateRequest, Order, Challenge도 허용한다. 공통 외부 접속 정책을 렌더링하는 `NetworkPolicy`도 허용한다. 이 하위 리소스들은 JSON 계약이 직접 생성하지 않는다. 기존 앱별 Traefik Middleware의 조회·정리를 위해 해당 허용 항목은 유지하지만 공통 Chart가 새 Middleware를 생성하지는 않는다.
 
 공유 CNPG Cluster, zot 레지스트리, Tailscale Operator·Connector, 공용 Traefik HTTPS 정책 같은 인프라 리소스는 `default` Project의 인프라 Application과 Root Application이 관리하며, 워크로드 Project에는 이 리소스의 생성 권한을 주지 않는다. `platform/defaults.json`은 모든 앱 values보다 먼저 병합되고 워크로드 계약에서는 덮어쓸 수 없다.
 

@@ -1,0 +1,25 @@
+{{- if and (include "homelab.egress.enabled" .) .Values.platform.egress.enforceNetworkPolicy }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: platform-egress
+  namespace: {{ .Values.metadata.namespace | quote }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.metadata.name | quote }}
+  policyTypes: [Egress]
+  egress:
+    # Internal Pods remain mutually reachable, including DNS, DB, storage and the proxy.
+    - to:
+        - namespaceSelector: {}
+    # The Kubernetes API is a node endpoint, not a regular selected Pod.
+    {{- range .Values.platform.egress.apiServerDestinations }}
+    - to:
+        - ipBlock:
+            cidr: {{ .cidr | quote }}
+      ports:
+        - protocol: TCP
+          port: {{ .port }}
+    {{- end }}
+{{- end }}

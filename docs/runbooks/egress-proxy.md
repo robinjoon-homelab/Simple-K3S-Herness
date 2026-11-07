@@ -11,7 +11,7 @@
 | 앱이 신뢰할 공개 루트 | Secret `egress-proxy-public-ca`의 `ca.crt` | `central-egress`에서 Reflector로 복제, Git 밖 |
 | 외부 서버 검증용 CA 번들 | ConfigMap `egress-proxy-upstream-ca`의 `ca-bundle.pem` | Git, 생성 도구로만 변경 |
 | 게이트웨이 설정 | ConfigMap `egress-proxy-config`의 `config.yaml` | Git |
-| 접속 허용 네임스페이스 | `network-policy.yaml`의 `kubernetes.io/metadata.name` 목록 | Git, 초기값은 `egress-proxy-canary`뿐 |
+| 프록시 접속 허용 | 카나리 및 워크로드 namespace에서 공통 Chart의 `egress-proxy=required` 라벨을 가진 Pod | Git, `network-policy.yaml` |
 | 이미지 | `registry.homelab.robinjoon.xyz/apps/agentgateway@sha256:...` | `deployment.yaml`, digest로 고정 |
 
 목적지 허용 목록은 없고 포트도 제한하지 않는다. 모든 터널을 복호화하며 인증서 검증을 끄는 설정과 TLS passthrough는 두지 않는다. 클라이언트가 SNI를 보내지 않거나 IP 주소로 접속하면 CONNECT 대상 기준으로 인증서를 발급한다.
@@ -210,31 +210,33 @@ kubectl -n egress-proxy-canary delete pod curl
 
 첫 명령은 직접 외부 연결이 막혀 `000`과 0이 아닌 종료 코드를 보여야 한다. 둘째 명령은 목록에 없는 네임스페이스에서 프록시에 닿지 못해 `000`을 보여야 한다.
 
-## 4. 앱 온보딩
+## 4. 공통 앱 설정과 호환 예외
 
-세 게이트를 통과한 뒤 앱을 한 개씩 옮긴다. 기존 앱은 아래 절차를 거치기 전까지 영향을 받지 않는다.
+`platform/defaults.json`의 `platform.egress`와 공통 Chart가 기존·신규 앱에 동일한 설정을 제공한다. 앱 소스, `application.yml`, 앱별 `workloads/*/values.json`은 수정하지 않는다. 환경변수·볼륨이 바뀌므로 적용 시 해당 Deployment의 Pod는 교체된다.
 
-1. `network-policy.yaml`의 `values`에 앱 네임스페이스를 추가해 병합한다.
-2. `python3 tools/platform.py get <app>` 결과를 기준으로 patch JSON을 만든다. `containers`와 `volumes`는 배열 전체가 교체되므로 기존 항목을 모두 포함하고 아래 값을 더한다. 병합 후 앱이 재시작한다.
+- `HTTPS_PROXY`·`https_proxy`와 내부 호스트용 `NO_PROXY`·`no_proxy`를 제공한다. 평문 HTTP는 프록시가 처리하지 않으므로 `HTTP_PROXY`는 설정하지 않는다.
+- 공개 검사 CA를 `/etc/platform-egress-ca/ca.crt`에 읽기 전용으로 마운트하고 `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`이 가리키게 한다. `SSL_CERT_DIR`은 공개 CA가 추가되지 않는 전용 디렉터리다.
+- 공통 init container가 검사 CA 묶음의 모든 인증서만 빈 PKCS12 저장소에 넣는다. 이미지의 공개 CA 저장소는 복사하지 않는다. `changeit`은 공개 인증서만 담은 파일의 형식상 암호이며 개인키나 비밀 값이 아니다.
+- `JAVA_TOOL_OPTIONS`로 HTTPS 프록시, 내부 호스트 제외, `/etc/platform-egress-trust/inspection.p12` 신뢰 저장소를 지정한다. 내부 Kubernetes API처럼 자체 CA를 사용하는 클라이언트의 SSLContext는 그대로 유지한다.
+- `enforceNetworkPolicy=true`이면 공통 `platform-egress` 정책이 인터넷으로 직접 나가는 IPv4·IPv6 TCP·UDP를 허용하지 않는다. 내부 Pod 간 통신은 그대로 허용하고 Kubernetes API의 Service·노드 주소만 별도로 허용한다. Ingress 정책은 추가하지 않는다.
 
-```json
-{
-  "env": [
-    {"name": "HTTPS_PROXY", "value": "http://egress-proxy.central-egress.svc.cluster.local:3128"},
-    {"name": "https_proxy", "value": "http://egress-proxy.central-egress.svc.cluster.local:3128"},
-    {"name": "NO_PROXY", "value": "localhost,127.0.0.1,.svc,.svc.cluster.local,.cluster.local,10.42.0.0/16,10.43.0.0/16"},
-    {"name": "no_proxy", "value": "localhost,127.0.0.1,.svc,.svc.cluster.local,.cluster.local,10.42.0.0/16,10.43.0.0/16"}
-  ],
-  "volumeMounts": [{"name": "egress-proxy-ca", "mountPath": "/etc/egress-proxy-ca", "readOnly": true}],
-  "volumes": [{"name": "egress-proxy-ca", "secret": {"secretName": "egress-proxy-public-ca"}}]
-}
-```
+프록시·CA 관련 환경변수와 두 `platform-egress-*` 볼륨 이름은 플랫폼 예약 값이다. 앱 values가 이를 덮어쓰면 렌더링을 거부한다. `NODE_EXTRA_CA_CERTS`는 기존 공인 CA 신뢰에 더하는 방식이라 쓰지 않는다. 환경변수나 JVM 옵션을 명시적으로 무시하는 클라이언트까지 자동으로 바뀌는 것은 아니므로 실제 실행 이미지의 클라이언트를 검증한다. [Java 프록시 속성](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/net/doc-files/net-properties.html), [HTTPX 환경변수](https://www.python-httpx.org/environment_variables/)
 
-3. 외부로 나가는 HTTP 클라이언트에 전용 TLS 설정을 만든다. 신뢰 저장소에는 `/etc/egress-proxy-ca/ca.crt` 하나만 넣고, 프록시도 코드에서 명시하거나 환경변수를 실제로 따르는지 확인한다. Python은 전용 `SSLContext`, Go는 전용 `RootCAs` 풀, Java는 전용 truststore를 쓴다. 내부 서비스용 클라이언트는 기존 신뢰 설정을 유지하도록 따로 둔다. `NODE_EXTRA_CA_CERTS`는 기존 공인 CA 신뢰에 더하는 방식이라 쓰지 않는다. 환경변수만으로는 라이브러리가 이 조건을 지키는지 보장하지 못한다.
-4. 앱의 실제 기능을 시험한다. 프록시 로그의 `http.host`로 트래픽이 지나가는지 확인한다.
-5. 우회를 막으려면 `infrastructure/central-egress/opt-in-<app>.yaml`에 `canary.yaml`의 `route-through-egress-proxy`와 같은 NetworkPolicy를 앱 네임스페이스로 추가한다. `policyTypes`는 `Egress`만 두어 Traefik 수신에 영향을 주지 않게 하고, 앱이 쓰는 DB 같은 내부 목적지를 함께 허용한다.
+### 단계별 적용
 
-인증서를 고정한 클라이언트와 외부 서버에 클라이언트 인증서를 제시하는 연결은 검사 프록시를 지나면 실패한다. 이런 앱은 예외를 만들지 말고 온보딩을 보류한다. 평문 HTTP는 처리하지 않으므로 `HTTP_PROXY`는 설정하지 않는다.
+1. 프록시의 게이트 A·B·C와 공개 CA Secret 복제를 확인한다.
+2. `enforceNetworkPolicy=false`로 공통 주입을 먼저 배포한다. 각 앱의 HTTPS가 프록시를 거치고 내부 DB·서비스가 정상인지 확인한다. 이 단계는 우회 차단 완료 상태가 아니다.
+3. 검증이 끝나면 `enforceNetworkPolicy=true`를 Git에 반영한다. 각 앱에서 정상 HTTPS와 직접 접속 차단을 확인한다.
+4. 검사 CA 자체를 교체할 때는 공개 Secret을 먼저 바꾸고 앱을 재시작해 PKCS12를 다시 생성한다. 외부 공개 CA 정책 변경은 이 과정과 무관하며 앱 재시작 없이 프록시에서 처리한다.
+
+### 호환 예외
+
+프록시를 무시하거나 인증서 고정·외부 mTLS 때문에 공통 설정으로 동작하지 않는 앱은 `platform.egress.excludedApps`에 앱 이름과 이유를 기록한다. 이 앱에는 공통 주입과 외부 차단 정책을 모두 적용하지 않는다. 앱별 설정 파일을 만들거나 코드, 검증 옵션을 바꾸지 않는다. 예외 앱은 기존 직접 접속을 유지하므로 전체 앱 전환 완료로 보고하지 않는다.
+
+현재 확인한 예외는 다음과 같다.
+
+- `scraping-platform` (`08a10e28`): 직접 경로와 `Socket(Proxy.NO_PROXY)`를 강제한다.
+- `notion-blog` (`0c7269cc`): 미디어 클라이언트가 `HttpClient.Builder.NO_PROXY`를 지정한다.
 
 ## 5. 외부 CA 번들 갱신
 
@@ -338,7 +340,7 @@ kubectl -n central-egress create secret generic egress-proxy-dynamic-ca \
 
 ## 8. 롤백
 
-1. 앱 하나를 되돌릴 때는 `opt-in-<app>.yaml`을 먼저 지우고, 앱의 patch를 되돌린 뒤, `network-policy.yaml`에서 네임스페이스를 뺀다. 이 순서를 어기면 앱의 외부 연결이 끊긴다.
+1. 운영자가 앱을 제외하기로 결정하면 중앙 `excludedApps`에 이유를 기록해 Git으로 반영한다. 공통 Chart가 해당 앱의 프록시·CA 주입과 `platform-egress` 정책을 함께 제거한다. 제외 후에는 직접 외부 접속을 사용하므로 중앙 검사 대상에서 빠진다.
 2. 이미지나 설정은 해당 커밋을 `git revert`로 되돌린다. 이전 이미지 digest가 레지스트리에 남아 있어야 한다.
 3. 프록시를 없앨 때는 모든 앱을 되돌린 뒤 `argocd/managed/apps/central-egress.yaml`을 지운다. Application의 finalizer가 선언한 리소스를 지운다. Git 밖의 Secret은 남으므로 `kubectl delete namespace central-egress`로 정리한다.
 

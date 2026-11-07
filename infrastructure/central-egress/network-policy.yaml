@@ -9,7 +9,7 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # 프록시를 쓰는 앱의 네임스페이스를 여기에 명시한다. 나머지는 접속할 수 없다.
+    # 카나리와 공통 Chart가 설정한 워크로드만 접근한다.
     - from:
         - namespaceSelector:
             matchExpressions:
@@ -17,6 +17,16 @@ spec:
                 operator: In
                 values:
                   - egress-proxy-canary
+      ports:
+        - protocol: TCP
+          port: 3128
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              simple-k3s-harness.dev/workload: "true"
+          podSelector:
+            matchLabels:
+              simple-k3s-harness.dev/egress-proxy: required
       ports:
         - protocol: TCP
           port: 3128

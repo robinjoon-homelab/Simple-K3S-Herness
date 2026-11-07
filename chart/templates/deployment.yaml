@@ -1,4 +1,5 @@
 {{- if eq .Values.workload.kind "deployment" }}
+{{- $egressEnabled := include "homelab.egress.enabled" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,6 +16,9 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ .Values.metadata.name | quote }}
+        {{- if $egressEnabled }}
+        simple-k3s-harness.dev/egress-proxy: required
+        {{- end }}
     spec:
       {{- with .Values.workload.serviceAccountName }}
       serviceAccountName: {{ . | quote }}
@@ -24,6 +28,38 @@ spec:
       {{- range . }}
         - name: {{ .name | quote }}
       {{- end }}
+      {{- end }}
+      {{- if $egressEnabled }}
+      initContainers:
+        - name: platform-egress-trust
+          image: {{ .Values.platform.egress.trustToolsImage | quote }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              {{- .Files.Get "files/build-egress-trust.sh" | nindent 14 }}
+            - build-egress-trust
+            - /ca/ca.crt
+            - /trust/inspection.p12
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: platform-egress-ca
+              mountPath: /ca
+              readOnly: true
+            - name: platform-egress-trust
+              mountPath: /trust
       {{- end }}
       containers:
       {{- range .Values.workload.containers }}
@@ -36,13 +72,19 @@ spec:
               containerPort: {{ .containerPort }}
           {{- end }}
           {{- end }}
-          {{- if or $.Values.database .env }}
+          {{- if or $egressEnabled $.Values.database .env }}
           env:
+          {{- if $egressEnabled }}
+            {{- include "homelab.egress.env" $ | nindent 12 }}
+          {{- end }}
           {{- if $.Values.database }}
             - name: DB_HOST
               value: {{ required "platform.database.host is required when database is declared" $.Values.platform.database.host | quote }}
           {{- end }}
           {{- range .env }}
+            {{- if and $egressEnabled (has .name (list "HTTPS_PROXY" "https_proxy" "HTTP_PROXY" "http_proxy" "ALL_PROXY" "all_proxy" "NO_PROXY" "no_proxy" "SSL_CERT_FILE" "SSL_CERT_DIR" "REQUESTS_CA_BUNDLE" "CURL_CA_BUNDLE" "JAVA_TOOL_OPTIONS")) }}
+              {{- fail "egress proxy and trust environment variables are managed by the platform" }}
+            {{- end }}
             {{- if and $.Values.database (eq .name "DB_HOST") }}
               {{- fail "DB_HOST is managed by the platform when database is declared" }}
             {{- end }}
@@ -83,8 +125,16 @@ spec:
             {{- end }}
           {{- end }}
           {{- end }}
-          {{- if .volumeMounts }}
+          {{- if or $egressEnabled .volumeMounts }}
           volumeMounts:
+          {{- if $egressEnabled }}
+            - name: platform-egress-ca
+              mountPath: /etc/platform-egress-ca
+              readOnly: true
+            - name: platform-egress-trust
+              mountPath: /etc/platform-egress-trust
+              readOnly: true
+          {{- end }}
           {{- range .volumeMounts }}
             - name: {{ .name | quote }}
               mountPath: {{ .mountPath | quote }}
@@ -97,9 +147,21 @@ spec:
           {{- end }}
           {{- end }}
       {{- end }}
-      {{- if .Values.workload.volumes }}
+      {{- if or $egressEnabled .Values.workload.volumes }}
       volumes:
+      {{- if $egressEnabled }}
+        - name: platform-egress-ca
+          secret:
+            secretName: {{ .Values.platform.egress.caSecretName | quote }}
+            defaultMode: 0444
+        - name: platform-egress-trust
+          emptyDir:
+            sizeLimit: 8Mi
+      {{- end }}
       {{- range .Values.workload.volumes }}
+        {{- if and $egressEnabled (has .name (list "platform-egress-ca" "platform-egress-trust")) }}
+          {{- fail "egress CA and trust volumes are managed by the platform" }}
+        {{- end }}
         {{- if and $.Values.database .secret (eq .secret.secretName "shared-db-app") }}
           {{- fail "shared-db-app may only supply port, username, and password to database workloads" }}
         {{- end }}

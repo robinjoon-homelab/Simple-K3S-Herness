@@ -464,6 +464,70 @@
               }
             }
           }
+        },
+        "egress": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "proxyHost",
+            "proxyPort",
+            "caSecretName",
+            "trustToolsImage",
+            "enforceNetworkPolicy",
+            "apiServerDestinations",
+            "excludedApps"
+          ],
+          "properties": {
+            "proxyHost": {
+              "type": "string",
+              "pattern": "^[a-z0-9.-]+$"
+            },
+            "proxyPort": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "caSecretName": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9.-]*$"
+            },
+            "trustToolsImage": {
+              "type": "string",
+              "pattern": "^.+@sha256:[0-9a-f]{64}$"
+            },
+            "enforceNetworkPolicy": {
+              "type": "boolean"
+            },
+            "apiServerDestinations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "cidr",
+                  "port"
+                ],
+                "properties": {
+                  "cidr": {
+                    "type": "string",
+                    "pattern": "^[0-9a-fA-F.:]+/[0-9]+$"
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                }
+              }
+            },
+            "excludedApps": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },
