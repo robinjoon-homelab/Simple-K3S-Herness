@@ -12,7 +12,7 @@ from tests.test_traefik_policy import parse_yaml_documents
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def render(name, enforce=True, override=None):
+def render(name, enforce=True, override=None, excluded=None):
     values_path = ROOT / "workloads" / name / "values.json"
     values = json.loads(values_path.read_text()) if values_path.exists() else {
         "contractVersion": 1, "metadata": {"name": name, "namespace": name},
@@ -25,17 +25,20 @@ def render(name, enforce=True, override=None):
     with tempfile.TemporaryDirectory() as directory:
         file = Path(directory) / "values.json"
         file.write_text(json.dumps(values))
-        return subprocess.run([
+        command = [
             "helm", "template", name, str(ROOT / "chart"),
             "-f", str(ROOT / "platform/defaults.json"), "-f", str(file),
             "--set", "platform.egress.enforceNetworkPolicy=" + str(enforce).lower(),
-        ], capture_output=True, text=True)
+        ]
+        if excluded is not None:
+            command += ["--set-json", "platform.egress.excludedApps=" + json.dumps(excluded)]
+        return subprocess.run(command, capture_output=True, text=True)
 
 
 @unittest.skipUnless(shutil.which("helm"), "helm CLI is required")
 class CommonEgressTest(unittest.TestCase):
     def test_existing_and_new_apps_get_shared_defaults(self):
-        for name in ("agent-docs", "asset-desk", "deploy-api", "sms", "new-app"):
+        for name in ("agent-docs", "asset-desk", "deploy-api", "sms", "scraping-platform", "notion-blog", "new-app"):
             with self.subTest(name=name):
                 result = render(name)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -52,6 +55,15 @@ class CommonEgressTest(unittest.TestCase):
                     self.assertEqual(len(container["env"]), len(env))
                 policy = next(x for x in docs if x["kind"] == "NetworkPolicy")
                 self.assertEqual(policy["spec"]["policyTypes"], ["Egress"])
+                selector = policy["spec"]["podSelector"]["matchLabels"]
+                self.assertEqual(selector, {
+                    "app.kubernetes.io/name": name,
+                    "simple-k3s-harness.dev/egress-proxy": "required",
+                })
+                new_labels = deployment["spec"]["template"]["metadata"]["labels"]
+                self.assertTrue(all(new_labels.get(key) == value for key, value in selector.items()))
+                old_labels = {"app.kubernetes.io/name": name}
+                self.assertFalse(all(old_labels.get(key) == value for key, value in selector.items()))
                 self.assertEqual(policy["spec"]["egress"][0], {"to": [{"namespaceSelector": {}}]})
                 for rule in policy["spec"]["egress"][1:]:
                     for target in rule["to"]:
@@ -60,8 +72,8 @@ class CommonEgressTest(unittest.TestCase):
                         self.assertEqual(network.num_addresses, 1)
 
     def test_exceptions_receive_neither_injection_nor_egress_block(self):
-        for name in ("scraping-platform", "notion-blog"):
-            result = render(name)
+        for name in ("excluded-app",):
+            result = render(name, excluded={name: "fixture: client ignores shared proxy settings"})
             self.assertEqual(result.returncode, 0, result.stderr)
             docs = parse_yaml_documents(result.stdout)
             self.assertFalse(any(x["kind"] == "NetworkPolicy" for x in docs))
