@@ -28,10 +28,7 @@
           "port": 6443
         }
       ],
-      "excludedApps": {
-        "scraping-platform": "Deployed 08a10e28 forces DefaultRoutePlanner and Socket(Proxy.NO_PROXY).",
-        "notion-blog": "Deployed 0c7269cc media client explicitly uses HttpClient.Builder.NO_PROXY."
-      }
+      "excludedApps": {}
     }
   }
 }

@@ -8,6 +8,8 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: {{ .Values.metadata.name | quote }}
+      # Old excluded Pods stay direct until the configured replacement takes over.
+      simple-k3s-harness.dev/egress-proxy: required
   policyTypes: [Egress]
   egress:
     # Internal Pods remain mutually reachable, including DNS, DB, storage and the proxy.

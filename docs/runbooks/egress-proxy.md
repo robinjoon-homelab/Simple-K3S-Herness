@@ -233,10 +233,9 @@ kubectl -n egress-proxy-canary delete pod curl
 
 프록시를 무시하거나 인증서 고정·외부 mTLS 때문에 공통 설정으로 동작하지 않는 앱은 `platform.egress.excludedApps`에 앱 이름과 이유를 기록한다. 이 앱에는 공통 주입과 외부 차단 정책을 모두 적용하지 않는다. 앱별 설정 파일을 만들거나 코드, 검증 옵션을 바꾸지 않는다. 예외 앱은 기존 직접 접속을 유지하므로 전체 앱 전환 완료로 보고하지 않는다.
 
-현재 확인한 예외는 다음과 같다.
+현재 중앙 예외 목록은 비어 있다. `scraping-platform`과 `notion-blog`은 각 저장소에서 표준 JVM 프록시·검사 CA 설정을 따르도록 수정했고, 검증된 새 이미지 배포를 확인한 뒤 예외를 해제한다. 앱별 프록시 주소나 CA 설정 파일은 추가하지 않는다.
 
-- `scraping-platform` (`08a10e28`): 직접 경로와 `Socket(Proxy.NO_PROXY)`를 강제한다.
-- `notion-blog` (`0c7269cc`): 미디어 클라이언트가 `HttpClient.Builder.NO_PROXY`를 지정한다.
+예외를 해제할 때 공통 차단 정책은 앱 이름과 `simple-k3s-harness.dev/egress-proxy=required` 라벨을 함께 선택한다. 기존 제외 Pod에는 이 라벨이 없으므로 설정된 새 Pod로 교체되기 전에 직접 연결이 먼저 차단되지 않는다. 교체가 끝난 뒤 모든 운영 Pod에 라벨과 정책이 적용됐는지 확인한다.
 
 ## 5. 외부 CA 번들 갱신
 
