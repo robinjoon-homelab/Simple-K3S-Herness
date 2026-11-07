@@ -343,10 +343,10 @@ class ManifestTest(unittest.TestCase):
     def test_access_log_omits_decrypted_paths(self):
         self.assertEqual(self.config["frontendPolicies"]["accessLog"]["remove"], ["http.path"])
 
-    def test_only_listed_namespaces_can_reach_the_proxy(self):
+    def test_only_canary_and_managed_workload_pods_can_reach_the_proxy(self):
         self.assertEqual(self.policy["podSelector"], {})
         self.assertEqual(self.policy["policyTypes"], ["Ingress", "Egress"])
-        rule, = self.policy["ingress"]
+        rule, managed = self.policy["ingress"]
         self.assertEqual(rule["ports"], [{"protocol": "TCP", "port": 3128}])
         source, = rule["from"]
         self.assertEqual(list(source), ["namespaceSelector"])
@@ -354,6 +354,11 @@ class ManifestTest(unittest.TestCase):
         self.assertEqual(expression["key"], "kubernetes.io/metadata.name")
         self.assertEqual(expression["operator"], "In")
         self.assertEqual(expression["values"], ["egress-proxy-canary"])
+        self.assertEqual(managed["ports"], [{"protocol": "TCP", "port": 3128}])
+        self.assertEqual(managed["from"], [{
+            "namespaceSelector": {"matchLabels": {"simple-k3s-harness.dev/workload": "true"}},
+            "podSelector": {"matchLabels": {"simple-k3s-harness.dev/egress-proxy": "required"}},
+        }])
 
     def test_egress_allows_dns_and_public_addresses_only(self):
         dns, public_v4, public_v6 = self.policy["egress"]

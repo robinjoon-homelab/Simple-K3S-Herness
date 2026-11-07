@@ -11,6 +11,27 @@
         "name": "letsencrypt-prod",
         "kind": "ClusterIssuer"
       }
+    },
+    "egress": {
+      "proxyHost": "egress-proxy.central-egress.svc.cluster.local",
+      "proxyPort": 3128,
+      "caSecretName": "egress-proxy-public-ca",
+      "trustToolsImage": "docker.io/library/eclipse-temurin@sha256:a98128a57de944a72bd31fbc79b898edd5a5864d3652071d5bbd2160ab7d7dce",
+      "enforceNetworkPolicy": false,
+      "apiServerDestinations": [
+        {
+          "cidr": "10.43.0.1/32",
+          "port": 443
+        },
+        {
+          "cidr": "192.168.0.195/32",
+          "port": 6443
+        }
+      ],
+      "excludedApps": {
+        "scraping-platform": "Deployed 08a10e28 forces DefaultRoutePlanner and Socket(Proxy.NO_PROXY).",
+        "notion-blog": "Deployed 0c7269cc media client explicitly uses HttpClient.Builder.NO_PROXY."
+      }
     }
   }
 }
