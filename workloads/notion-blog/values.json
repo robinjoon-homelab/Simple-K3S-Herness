@@ -100,6 +100,20 @@
               "name": "notion-blog-runtime",
               "key": "BLOG_ADMIN_PASSWORD"
             }
+          },
+          {
+            "name": "ADMIN_USERNAME",
+            "secretKeyRef": {
+              "name": "notion-blog-runtime",
+              "key": "ADMIN_USERNAME"
+            }
+          },
+          {
+            "name": "ADMIN_PASSWORD",
+            "secretKeyRef": {
+              "name": "notion-blog-runtime",
+              "key": "ADMIN_PASSWORD"
+            }
           }
         ]
       }

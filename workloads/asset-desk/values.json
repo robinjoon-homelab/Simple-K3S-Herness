@@ -138,6 +138,20 @@
           {
             "name": "TZ",
             "value": "Asia/Seoul"
+          },
+          {
+            "name": "ADMIN_USERNAME",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "ADMIN_USERNAME"
+            }
+          },
+          {
+            "name": "ADMIN_PASSWORD",
+            "secretKeyRef": {
+              "name": "asset-desk-runtime",
+              "key": "ADMIN_PASSWORD"
+            }
           }
         ]
       }

@@ -63,6 +63,20 @@
           {
             "name": "SERVER_TOMCAT_USE_RELATIVE_REDIRECTS",
             "value": "true"
+          },
+          {
+            "name": "ADMIN_USERNAME",
+            "secretKeyRef": {
+              "name": "sms-operator",
+              "key": "ADMIN_USERNAME"
+            }
+          },
+          {
+            "name": "ADMIN_PASSWORD",
+            "secretKeyRef": {
+              "name": "sms-operator",
+              "key": "ADMIN_PASSWORD"
+            }
           }
         ],
         "volumeMounts": []
