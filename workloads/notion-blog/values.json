@@ -88,20 +88,6 @@
             }
           },
           {
-            "name": "BLOG_ADMIN_USERNAME",
-            "secretKeyRef": {
-              "name": "notion-blog-runtime",
-              "key": "BLOG_ADMIN_USERNAME"
-            }
-          },
-          {
-            "name": "BLOG_ADMIN_PASSWORD",
-            "secretKeyRef": {
-              "name": "notion-blog-runtime",
-              "key": "BLOG_ADMIN_PASSWORD"
-            }
-          },
-          {
             "name": "ADMIN_USERNAME",
             "secretKeyRef": {
               "name": "notion-blog-runtime",

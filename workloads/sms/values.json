@@ -47,20 +47,6 @@
             }
           },
           {
-            "name": "SMS_OPERATOR_USERNAME",
-            "secretKeyRef": {
-              "name": "sms-operator",
-              "key": "username"
-            }
-          },
-          {
-            "name": "SMS_OPERATOR_PASSWORD_HASH",
-            "secretKeyRef": {
-              "name": "sms-operator",
-              "key": "password-hash"
-            }
-          },
-          {
             "name": "SERVER_TOMCAT_USE_RELATIVE_REDIRECTS",
             "value": "true"
           },
