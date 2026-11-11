@@ -152,6 +152,10 @@
               "name": "asset-desk-runtime",
               "key": "ADMIN_PASSWORD"
             }
+          },
+          {
+            "name": "SPRING_PROFILES_ACTIVE",
+            "value": "prod"
           }
         ]
       }
