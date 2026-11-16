@@ -56,6 +56,20 @@
               "name": "scraping-platform-runtime",
               "key": "api-token"
             }
+          },
+          {
+            "name": "ADMIN_USERNAME",
+            "secretKeyRef": {
+              "name": "scraping-platform-admin",
+              "key": "username"
+            }
+          },
+          {
+            "name": "ADMIN_PASSWORD",
+            "secretKeyRef": {
+              "name": "scraping-platform-admin",
+              "key": "password"
+            }
           }
         ]
       }
