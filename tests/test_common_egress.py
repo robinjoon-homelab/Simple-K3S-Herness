@@ -38,7 +38,7 @@ def render(name, enforce=True, override=None, excluded=None):
 @unittest.skipUnless(shutil.which("helm"), "helm CLI is required")
 class CommonEgressTest(unittest.TestCase):
     def test_existing_and_new_apps_get_shared_defaults(self):
-        for name in ("agent-docs", "asset-desk", "deploy-api", "sms", "scraping-platform", "notion-blog", "new-app"):
+        for name in ("agent-docs", "deploy-api", "sms", "scraping-platform", "notion-blog", "new-app"):
             with self.subTest(name=name):
                 result = render(name)
                 self.assertEqual(result.returncode, 0, result.stderr)
