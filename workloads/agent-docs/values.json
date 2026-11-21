@@ -12,7 +12,7 @@
         "name": "app",
         "image": {
           "repository": "registry.homelab.robinjoon.xyz/apps/agent-docs",
-          "tag": "sha-e00f4242e6695f822ac7271f0849dc7b9d134f5d-run-44486056176-1"
+          "tag": "sha-c47aae207ae09683f244e82207d5828057758b00-run-44890124659-1"
         },
         "ports": [
           {
