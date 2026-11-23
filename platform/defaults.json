@@ -16,7 +16,7 @@
       "proxyHost": "egress-proxy.central-egress.svc.cluster.local",
       "proxyPort": 3128,
       "caSecretName": "egress-proxy-public-ca",
-      "trustToolsImage": "docker.io/library/eclipse-temurin@sha256:a98128a57de944a72bd31fbc79b898edd5a5864d3652071d5bbd2160ab7d7dce",
+      "trustToolsImage": "docker.io/library/eclipse-temurin@sha256:2ec98aa522c472deadfd2b7c5b39bca680e33ef522a53a72f10789bdf89a6bb5",
       "enforceNetworkPolicy": true,
       "apiServerDestinations": [
         {
